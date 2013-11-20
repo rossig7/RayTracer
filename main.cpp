@@ -22,16 +22,14 @@
 #include "Triangle.h"
 #include "Photon.h"
 
-#define PHOTONMUM 15000
-#define PHOTONUSE 50
+#define PHOTONMUM 1000
+#define PHOTONUSE 5
 #define PHOTONDIST 0.05
 
 #define PI 3.1415926
 #define BOUNCE 3
 
 using namespace std;
-
-
 
 Photon photonMap[PHOTONMUM*BOUNCE*BOUNCE*BOUNCE*BOUNCE];
 int storedPhotonMum = 0;
@@ -98,7 +96,7 @@ void saveBmp(const char *filename, int w, int h, int dpi, RGBType *data){
 		double green = data[i].g*255;
 		double blue = data[i].b*255;
 
-		unsigned char color[3] = {(int)floor(blue), (int)floor(green), (int)floor(red)};
+		unsigned char color[3] = {(unsigned char)floor(blue), (unsigned char)floor(green), (unsigned char)floor(red)};
 
 		fwrite(color,1,3,f);
 	}
@@ -666,7 +664,7 @@ int main (int argc, char* argv[]){
 	double tempRed, tempGreen, tempBlue;
 
 	tPrep = clock();
-	float diffPrep = ((float)tPrep - (float)t1)/1000;
+	float diffPrep = ((float)tPrep - (float)t1)/CLOCKS_PER_SEC;
 	cout<< diffPrep<<"seconds"<<endl;
 
 	cout<<"start emit photons..."<<endl;
@@ -858,7 +856,7 @@ int main (int argc, char* argv[]){
 	}
 
 	tTracing = clock();
-	float diffTracing = ((float)tTracing - (float)tPrep)/1000;
+	float diffTracing = ((float)tTracing - (float)tPrep)/CLOCKS_PER_SEC;
 	cout<< diffTracing<<"seconds"<<endl << "saving file"<<endl;
 
 	saveBmp("scene.bmp", width, height, dpi, pixels);
@@ -867,7 +865,7 @@ int main (int argc, char* argv[]){
 	delete pixels, tempRed, tempGreen, tempBlue;;
 
 	t2 = clock();
-	float diff = ((float)t2 - (float)t1)/1000;
+	float diff = ((float)t2 - (float)t1)/CLOCKS_PER_SEC;
 
 	cout<< diff<<"seconds"<<endl;
 
