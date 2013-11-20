@@ -24,7 +24,7 @@
 
 #define PHOTONMUM 1000
 #define PHOTONUSE 5
-#define PHOTONDIST 0.05
+#define PHOTONDIST 0.005
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -363,10 +363,10 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 			actuallyPhotonUse = pn;
 		}
 		
-		//if (actuallyPhotonUse != 0) {
-			final_color = final_color.colorScalar(1.0/(actuallyPhotonUse+1));
+		if (actuallyPhotonUse != 0) {
+			final_color = final_color.colorScalar(1.0/(actuallyPhotonUse));
 			//final_color = final_color.colorScalar(1.0/(4*PI));
-		//}
+		}
 		
 	
 		for (int haha = 0; haha < actuallyPhotonUse; haha++) {
