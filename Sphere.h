@@ -61,7 +61,7 @@ public:
 			}
 			else{
 				// the second root is the smallest positive root
-				double root_2 = ((-1*b - sqrt(discriminant)-b)/2) - 0.000001;
+				double root_2 = ((-1*b + sqrt(discriminant)-b)/2) - 0.000001;
 				return root_2;
 			}
 		}
