@@ -1,2 +1,10 @@
 *.out
 *.bmp
+/Debug
+/Release
+*.sdf
+*.sln
+*.suo
+*.vcxproj
+*.filters
+*.opensdf
