@@ -23,10 +23,10 @@
 #include "Plane.h"
 #include "Triangle.h"
 #include "Photon.h"
+#include "Kdtree.h"
 
 #define PHOTONMUM 200000
 #define PHOTONUSE 200
-#define PHOTONDIST 0.3
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -36,261 +36,7 @@ using namespace std;
 Photon photonMap[PHOTONMUM* BOUNCE* BOUNCE* BOUNCE* BOUNCE];
 int storedPhotonMum = 0;
 
-const int max_elements = 3;
-
-struct KDNode {
-	// 0:x ; 1:y ; 2:z
-	short axis;
-	Photon *self;
-	vector<Photon *> left, right;
-	KDNode *left_branch, *right_branch;
-
-	KDNode()
-	{
-		left_branch = right_branch = NULL;
-		axis = -1;
-	}
-};
-
-void createKD(vector<Photon *> &photons, KDNode *parent)
-{
-	assert(photons.size() > max_elements);
-	switch (parent->axis) {
-		case 0:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectX() < b->position.getVectX();
-							});
-	        break;
-		case 1:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectY() < b->position.getVectY();
-							});
-	        break;
-		case 2:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectZ() < b->position.getVectZ();
-							});
-	        break;
-	}
-
-	int mid = photons.size() / 2;
-	parent->self = photons[mid];
-	/*cout << "Axis: " << parent->axis << " Pos:" << parent->self->position.getVectX()
-			<< " " << parent->self->position.getVectY()
-			<< " " << parent->self->position.getVectZ()
-			<< " Mid: " << mid << endl ;  */
-	vector<Photon *> left(photons.begin(), photons.begin() + mid),
-			right(photons.begin() + mid + 1, photons.end());
-	if (left.size() <= max_elements) {
-		parent->left = left;
-	}
-	else {
-		parent->left_branch = new KDNode();
-		parent->left_branch->axis = (parent->axis + 1) % 3;
-		createKD(left, parent->left_branch);
-	}
-	if (right.size() <= max_elements) {
-		parent->right = right;
-	}
-	else {
-		parent->right_branch = new KDNode();
-		parent->right_branch->axis = (parent->axis + 1) % 3;
-		createKD(right, parent->right_branch);
-	}
-
-	return;
-}
-
-KDNode *Root;
-class distanceComparsion {
-	Vect center;
-public:
-	distanceComparsion(Vect center_)
-	{
-		center = center_;
-	}
-
-	bool operator ()(const Photon *lhs, const Photon *rhs) const
-	{
-		return lhs->position.sqrDist(center) < rhs->position.sqrDist(center);
-	}
-};
-
-priority_queue<Photon *, vector<Photon *>, distanceComparsion> *KNN_queue;
-
-int perf_count = 0;
-void findKNN_(int k, Vect center, KDNode *root)
-{
-	/*
-	Photon * topPhoton = KNN_queue->top();
-	float farDistance = topPhoton->position.sqrDist(center);
-    */
-
-	for (int i = 0; i < root->left.size(); i++) {
-		perf_count++;
-		if (KNN_queue->size() < k &&
-				root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->left[i]);
-			continue;
-		}
-		float dis = 1e3;
-		if(KNN_queue->size() > 0)
-		{
-			Photon *topPhoton = KNN_queue->top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->left[i]->position.sqrDist(center) < dis
-				&& root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->left[i]);
-			KNN_queue->pop();
-		}
-	}
-
-	for (int i = 0; i < root->right.size(); i++) {
-		perf_count++;
-		if (KNN_queue->size() < k &&
-				root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->right[i]);
-			continue;
-		}
-		float dis = 1e3;
-		if(KNN_queue->size() > 0)
-		{
-			Photon *topPhoton = KNN_queue->top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->right[i]->position.sqrDist(center) < dis
-			&& root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->right[i]);
-			KNN_queue->pop();
-		}
-	}
-
-	// Pivot Self
-	perf_count++;
-	if (KNN_queue->size() < k &&
-			root->self->position.sqrDist(center) < PHOTONDIST) {
-		KNN_queue->push(root->self);
-	}
-	else {
-		float dis = 1e3;
-		if(KNN_queue->size() > 0)
-		{
-			Photon *topPhoton = KNN_queue->top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->self->position.sqrDist(center) < dis &&
-				root->self->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->self);
-			KNN_queue->pop();
-		}
-	}
-
-	// Order Left First
-	int is_left_first = 0;
-	int need_other = 1;
-	switch (root->axis) {
-		case 0:
-			if (center.getVectX() < root->self->position.getVectX())
-				is_left_first = 1;
-	        break;
-		case 1:
-			if (center.getVectY() < root->self->position.getVectY())
-				is_left_first = 1;
-	        break;
-		case 2:
-			if (center.getVectZ() < root->self->position.getVectZ())
-				is_left_first = 1;
-	        break;
-	}
-
-	if (is_left_first) {
-		if (root->left_branch) {
-			findKNN_(k, center, root->left_branch);
-		}
-		float dis = 1e3;
-		if(KNN_queue->size() > 0)
-		{
-			Photon *topPhoton = KNN_queue->top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		float farDistance = min(PHOTONDIST * PHOTONDIST * 1.,dis * 1.);
-		switch (root->axis) {
-			case 0:
-				if (abs(center.getVectX() - root->self->position.getVectX()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 1:
-				if (abs(center.getVectY() - root->self->position.getVectY()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 2:
-				if (abs(center.getVectZ() - root->self->position.getVectZ()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-		}
-		if (need_other && root->right_branch) {
-			findKNN_(k, center, root->right_branch);
-		}
-	}
-	else {
-		if (root->right_branch) {
-			findKNN_(k, center, root->right_branch);
-		}
-
-		float dis = 1e3;
-		if(KNN_queue->size() > 0)
-		{
-			Photon *topPhoton = KNN_queue->top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		float farDistance = min(PHOTONDIST * PHOTONDIST * 1.,dis * 1.);
-		switch (root->axis) {
-			case 0:
-				if (abs(center.getVectX() - root->self->position.getVectX()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 1:
-				if (abs(center.getVectY() - root->self->position.getVectY()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 2:
-				if (abs(center.getVectZ() - root->self->position.getVectZ()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-		}
-
-		if (need_other && root->left_branch) {
-			findKNN_(k, center, root->left_branch);
-		}
-
-	}
-}
-
-
-vector<Photon *> findKNN(int k, Vect center, KDNode *root)
-{
-	KNN_queue = new priority_queue<Photon *, vector<Photon *>, distanceComparsion>
-			(distanceComparsion(center));
-
-	findKNN_(k, center, root);
-
-	vector<Photon *> result;
-	while (KNN_queue->size() > 0) {
-		result.push_back(KNN_queue->top());
-		KNN_queue->pop();
-	}
-	reverse(result.begin(), result.end());
-	delete KNN_queue;
-	return result;
-}
-
+KDTree *kdtree;
 
 struct RGBType {
 	double r;
@@ -562,7 +308,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 	else {
 
-		vector<Photon *> photon_find = findKNN(PHOTONUSE, intersection_position, Root);
+		vector<Photon *> photon_find = kdtree->findKNN(PHOTONUSE, intersection_position);
 
 
 		for(int i = 0; i < photon_find.size(); i++)
@@ -728,7 +474,7 @@ int main(int argc, char *argv[])
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 
 	Sphere scene_sphere (new_sphere_pos, 0.3, pretty_green);
-	Sphere scene_sphere2 (new_sphere_pos2, 0.3, orange);
+	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite);
 	Plane scene_plane(Y, -1, maroon);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange);
 
@@ -851,11 +597,9 @@ int main(int argc, char *argv[])
 	}
 
 	vector<Photon *> photons;
-	Root = new KDNode();
-	Root->axis = 0;
 	for (int i = 0; i < storedPhotonMum; i++)
 		photons.push_back(photonMap + i);
-	createKD(photons, Root);
+	kdtree = new KDTree(photons);
 
 	// Test kd tree
 	/*

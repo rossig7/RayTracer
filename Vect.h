@@ -7,8 +7,17 @@
 class Vect{
 	 double x, y, z;
 public:
-	Vect();
-	Vect(double i , double j, double k);
+	Vect(){
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+
+	Vect(double i , double j, double k){
+		x = i;
+		y = j;
+		z = k;
+	}
 
 	double getVectX() const{return x;}
 	double getVectY() const{return y;}
@@ -49,16 +58,6 @@ public:
 	}
 };
 
-Vect::Vect(){
-	x = 0;
-	y = 0;
-	z = 0;
-}
 
-Vect::Vect(double i , double j, double k){
-	x = i;
-	y = j;
-	z = k;
-}
 
 #endif
