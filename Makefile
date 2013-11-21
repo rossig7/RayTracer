@@ -1,2 +1,2 @@
 all:
-	g++ -O3 -Wno-unused-value  *.cpp -o a.out
+	g++ -O3 -std=gnu++11 -Wno-unused-value  *.cpp -o a.out

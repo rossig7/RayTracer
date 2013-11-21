@@ -10,9 +10,9 @@ public:
 	Vect();
 	Vect(double i , double j, double k);
 
-	double getVectX(){return x;}
-	double getVectY(){return y;}
-	double getVectZ(){return z;}
+	double getVectX() const{return x;}
+	double getVectY() const{return y;}
+	double getVectZ() const{return z;}
 
 	double magnitude(){
 		return sqrt(x*x+y*y+z*z);
@@ -39,8 +39,13 @@ public:
 		return Vect (x+v.getVectX(), y+v.getVectY(), z+ v.getVectZ());
 	}
 
-	Vect vectMult(double scalar){
+	Vect vectMult (double scalar)const{
 		return Vect (x*scalar, y *scalar, z*scalar);
+	}
+
+	double sqrDist(Vect v) const{
+		return (x - v.x) * (x - v.x) + (y - v.y) * (y - v.y)
+				+ (z - v.z) * (z - v.z);
 	}
 };
 
