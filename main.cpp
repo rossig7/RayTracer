@@ -24,9 +24,9 @@
 #include "Triangle.h"
 #include "Photon.h"
 
-#define PHOTONMUM 100000
+#define PHOTONMUM 200000
 #define PHOTONUSE 200
-#define PHOTONDIST 0.2
+#define PHOTONDIST 0.3
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -166,7 +166,7 @@ void findKNN_(int k, Vect center, KDNode *root)
 			dis = topPhoton->position.sqrDist(center);
 		}
 		if (root->right[i]->position.sqrDist(center) < dis
-			&& root->left[i]->position.sqrDist(center) < PHOTONDIST) {
+			&& root->right[i]->position.sqrDist(center) < PHOTONDIST) {
 			KNN_queue->push(root->right[i]);
 			KNN_queue->pop();
 		}
@@ -857,10 +857,12 @@ int main(int argc, char *argv[])
 		photons.push_back(photonMap + i);
 	createKD(photons, Root);
 
-
+	// Test kd tree
+	/*
 	const Vect Goal(1,0.5,0.4);
 	perf_count = 0;
 	vector<Photon *> testfind = findKNN(20, Goal, Root);
+    */
 
 	/*
 	for (int i = 0; i < testfind.size(); i++) {
