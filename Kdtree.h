@@ -37,7 +37,7 @@ private:
 	};
 
 	int perf_count;
-	const int max_elements = 3;
+	static const int max_elements = 3;
 	KDNode *Root;
 	priority_queue<Photon *, vector<Photon *>, distanceComparsion> *KNN_queue;
 
