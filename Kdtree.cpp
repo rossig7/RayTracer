@@ -258,3 +258,35 @@ vector<Photon *> KDTree::findKNN(int k, Vect center)
 	delete KNN_queue;
 	return result;
 }
+
+// Test kd tree
+/*
+const Vect Goal(1,0.5,0.4);
+perf_count = 0;
+vector<Photon *> testfind = findKNN(20, Goal, Root);
+vector<Photon *> copy_test = photons;
+sort(copy_test.begin(), copy_test.end(),
+		[Goal](const Photon *a, const Photon *b) -> bool
+				{
+					return a->position.sqrDist(Goal) <
+							b->position.sqrDist(Goal);
+				});
+
+cout << "Total..." << perf_count << endl;
+for (int i = 0; i < testfind.size(); i++) {
+	//cout << testfind[i]->position.sqrDist(copy_test[i]->position) << endl;
+	if(testfind[i]->position.sqrDist(Goal) -
+			copy_test[i]->position.sqrDist(Goal) > 1e-7)
+	{
+		cout << testfind[i]->position.getVectX() << " "
+			<< testfind[i]->position.getVectY() << " "
+				<< testfind[i]->position.getVectZ() << " "
+				<< endl;
+		cout << copy_test[i]->position.getVectX() << " "
+				<< copy_test[i]->position.getVectY() << " "
+				<< copy_test[i]->position.getVectZ() << " "
+				<< endl;
+		cout << endl;
+	}
+}
+*/
