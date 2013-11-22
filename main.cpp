@@ -35,7 +35,6 @@
 
 using namespace std;
 
-//Photon photonMap[PHOTONMUM* BOUNCE* BOUNCE* BOUNCE* BOUNCE];
 int storedPhotonMum = 0;
 vector<Photon *> photons;
 
@@ -307,7 +306,6 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 	return final_color.clip();
 }
 
-int thisone;
 vector<Object *> scene_objects;
 
 void makeCube(Vect corner1, Vect corner2, Color color)
@@ -448,7 +446,7 @@ int main(int argc, char *argv[])
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 
 	Sphere scene_sphere (new_sphere_pos, 0.3, pretty_green);
-	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite);
+	Sphere scene_sphere2 (new_sphere_pos2, 0.3, orange);
 	Plane scene_plane(Y, -1, maroon);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange);
 
@@ -571,48 +569,7 @@ int main(int argc, char *argv[])
 
 	kdtree = new KDTree(photons);
 
-	// Test kd tree
-	/*
-	const Vect Goal(1,0.5,0.4);
-	perf_count = 0;
-	vector<Photon *> testfind = findKNN(20, Goal, Root);
-    */
 
-	/*
-	for (int i = 0; i < testfind.size(); i++) {
-		cout << testfind[i]->position.getVectX() << " "
-				<< testfind[i]->position.getVectY() << " "
-				<< testfind[i]->position.getVectZ() << " " << endl;
-	}
-    */
-
-	/*
-	vector<Photon *> copy_test = photons;
-	sort(copy_test.begin(), copy_test.end(),
-			[Goal](const Photon *a, const Photon *b) -> bool
-					{
-						return a->position.sqrDist(Goal) <
-								b->position.sqrDist(Goal);
-					});
-
-	cout << "Total..." << perf_count << endl;
-	for (int i = 0; i < testfind.size(); i++) {
-		//cout << testfind[i]->position.sqrDist(copy_test[i]->position) << endl;
-		if(testfind[i]->position.sqrDist(Goal) -
-				copy_test[i]->position.sqrDist(Goal) > 1e-7)
-		{
-			cout << testfind[i]->position.getVectX() << " "
-				<< testfind[i]->position.getVectY() << " "
-					<< testfind[i]->position.getVectZ() << " "
-					<< endl;
-			cout << copy_test[i]->position.getVectX() << " "
-					<< copy_test[i]->position.getVectY() << " "
-					<< copy_test[i]->position.getVectZ() << " "
-					<< endl;
-			cout << endl;
-		}
-	}
-	*/
 	cout << "start ray tracing..." << endl;
 
 	for (int x = 0; x < width; x++) {
@@ -740,6 +697,7 @@ int main(int argc, char *argv[])
 	t2 = clock();
 	float diff = ((float) t2 - (float) t1) / CLOCKS_PER_SEC;
 
+	delete kdtree;
 	cout << diff << "seconds" << endl;
 
 	system("pause");
