@@ -297,9 +297,9 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		if (photon_find.size() != 0) {
 			//final_color = final_color.colorScalar(1.0 / (photon_find.size()));
 #ifdef CONE
-			final_color = final_color.colorScalar(1.0/(PHOTONUSE*16*PI*maxDistSqr * (1 - 2/(3*k))));
+			final_color = final_color.colorScalar(1.0/(PHOTONMUM/16*PI*maxDistSqr * (1 - 2/(3*k))));
 #else
-			final_color = final_color.colorScalar(1.0/(PHOTONUSE*16*PI*maxDistSqr));
+			final_color = final_color.colorScalar(1.0/(PHOTONMUM/16*PI*maxDistSqr));
 #endif
 		}
 	}
