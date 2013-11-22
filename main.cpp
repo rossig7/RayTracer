@@ -25,6 +25,7 @@
 #include "Photon.h"
 #include "Kdtree.h"
 
+
 #define PHOTONMUM 200000
 #define PHOTONUSE 800
 
@@ -149,7 +150,7 @@ int winningObjectIndex(vector<double> object_intersections)
 	}
 }
 
-Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, vector<Source *> light_sources, double accuracy, double ambientLight, Color lightColor, int bounce)
+Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, Color lightColor, int bounce)
 {
 	Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
 
@@ -318,6 +319,135 @@ double FresnelEquation(float cosThetaI, float n1, float n2, int type){
 		return (Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
 	else
 		return 1-(Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
+}
+
+void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> scene_objects, double accuracy, double ambientLight, Color lightColor, int bounce) {
+	//cout << bounce << endl;
+	if (bounce> BOUNCE)
+		return;
+	
+	vector<double> intersections;
+
+	for (int index = 0; index < scene_objects.size(); index++) {
+		intersections.push_back(scene_objects.at(index)->findIntersection(photon_ray));
+	}
+
+	int index_of_winning_object = winningObjectIndex(intersections);
+
+	if (index_of_winning_object == -1) {
+		//if (bounce == 0) pn--;
+		return;
+	}
+
+	if (intersections.at(index_of_winning_object) > accuracy) {
+		Vect intersection_position = photon_ray.getRayOrigin().vectAdd(photon_ray_direction.vectMult(intersections.at(index_of_winning_object)));
+		Vect intersecting_ray_direction = photon_ray_direction;
+		Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+
+		float reflectance = 1;
+		int refractMask[3] = {1,1,1};
+		bool canTransmit = true;
+
+		if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() == 0) {
+			lightColor = storePhoton(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, lightColor, bounce);
+			reflectance = 0.6;
+
+			int roll = rand() % 100;
+			if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
+				canTransmit = false;
+			}
+		}
+		else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
+			float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+			float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
+
+			reflectance = FresnelEquation(cosTheta, 1, n2, 0);
+			int roll = rand() % 100;
+			if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
+				canTransmit = false;
+			}
+		}
+		else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 2) {
+			for (int i = 0; i < 3; i++) {
+				float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+				float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx()-0.01 + i/100.0;
+
+				if (cosTheta > 0) 
+					reflectance = FresnelEquation(cosTheta, 1, n2, 1);
+				else {
+					cosTheta = winning_object_normal.negtive().dotProduct(intersecting_ray_direction.negtive());
+					reflectance = FresnelEquation(cosTheta, n2, 1, 1);
+				}
+				int roll = rand() % 100;
+				if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
+					refractMask[i] = 0;
+				}
+			}
+		}
+
+		if (canTransmit) {
+			if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
+				lightColor = lightColor.colorScalar(0.7);
+				double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive()); // N*L
+				Vect scalar1 = winning_object_normal.vectMult(dot1); // (N*L)*N
+				Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
+				Vect scalar2 = add1.vectMult(2);
+				Vect add2 = intersecting_ray_direction.negtive().vectAdd(scalar2);
+				Vect reflection_dir = add2.normalize();
+
+				photon_ray = Ray(intersection_position, reflection_dir);
+				photon_ray_direction = reflection_dir;
+				photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce+1);
+			}
+			else {
+				lightColor = lightColor.colorScalar(1);
+				for (int i = 0; i < 3; i++) {
+					if (refractMask == 0) continue;
+					double n1n2 = 1.0 / (scene_objects.at(index_of_winning_object)->getRefraIdx()-0.01 + i/100.0);
+					double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+	
+					if (dot1 < 0) {
+						winning_object_normal = winning_object_normal.negtive();
+						dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+						n1n2 = 1.0 / n1n2;
+					}
+	
+					double nNL = n1n2 * dot1;  //n*NL
+					double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
+	
+					if (underSQRT > 0) {
+						Color refractColor;
+						double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
+						Vect refraction_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+	
+						Ray refraction_ray(intersection_position, refraction_direction);
+	
+						photon_ray = refraction_ray;
+						photon_ray_direction = refraction_direction;
+						//bounce--;
+						//lightColor = white_light;
+						if (i == 0) {
+							refractColor = lightColor;
+							refractColor.setColorGreen(0);
+							refractColor.setColorBlue(0);
+						}
+						else if (i == 1) {
+							refractColor = lightColor;
+							refractColor.setColorRed(0);
+							refractColor.setColorBlue(0);
+						}
+						else if (i == 2) {
+							refractColor = lightColor;
+							refractColor.setColorRed(0);
+							refractColor.setColorGreen(0);
+						}
+						if (!(refractColor.getColorRed() == 0 && refractColor.getColorGreen() == 0 && refractColor.getColorBlue() == 0))
+							photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, refractColor, bounce+1);
+					}		
+				}
+			}			
+		}		
+	}
 }
 
 
@@ -501,98 +631,11 @@ int main(int argc, char *argv[])
 
 		Color lightColor = white_light;
 
-		for (int bounce = 0; bounce < BOUNCE; bounce++) {
-			vector<double> intersections;
+		int bounce = 0;
+		photonEmission(photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce);
 
-			for (int index = 0; index < scene_objects.size(); index++) {
-				intersections.push_back(scene_objects.at(index)->findIntersection(photon_ray));
-			}
-
-			int index_of_winning_object = winningObjectIndex(intersections);
-
-			if (index_of_winning_object == -1) {
-				if (bounce == 0) pn--;
-				break;
-			}
-
-			if (intersections.at(index_of_winning_object) > accuracy) {
-				Vect intersection_position = photon_ray.getRayOrigin().vectAdd(photon_ray_direction.vectMult(intersections.at(index_of_winning_object)));
-				Vect intersecting_ray_direction = photon_ray_direction;
-				Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
-
-				float reflectance = 1;
-
-				if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() == 0) {
-					lightColor = storePhoton(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientLight, lightColor, bounce);
-					reflectance = 0.8;
-				}
-				else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
-					float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-					float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
-
-					reflectance = FresnelEquation(cosTheta, 1, n2, 0);
-				}
-				else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 2) {
-					float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-					float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
-
-					reflectance = FresnelEquation(cosTheta, 1, n2, 1);
-				}
-
-				int roll = rand() % 100;
-				if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
-					break;
-				}
-				else {
-					if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
-						lightColor = lightColor.colorScalar(0.7);
-						double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive()); // N*L
-						Vect scalar1 = winning_object_normal.vectMult(dot1); // (N*L)*N
-						Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
-						Vect scalar2 = add1.vectMult(2);
-						Vect add2 = intersecting_ray_direction.negtive().vectAdd(scalar2);
-						Vect reflection_dir = add2.normalize();
-
-						photon_ray = Ray(intersection_position, reflection_dir);
-						photon_ray_direction = reflection_dir;
-					}
-					else {
-						lightColor = lightColor.colorScalar(1);
-						double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
-						double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
-
-						if (dot1 < 0) {
-							winning_object_normal = winning_object_normal.negtive();
-							dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-							n1n2 = 1.0 / n1n2;
-						}
-
-						double nNL = n1n2 * dot1;  //n*NL
-						double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
-
-						if (underSQRT > 0) {
-
-							double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-							Vect refraction_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
-
-							Ray refraction_ray(intersection_position, refraction_direction);
-
-							photon_ray = refraction_ray;
-							photon_ray_direction = refraction_direction;
-							bounce--;
-							lightColor = white_light;
-						}
-					}
-				}		
-			}
-		}
 		pn++;
 	}
-
-	/*
-	for (int i = 0; i < storedPhotonMum; i++)
-		photons.push_back(photonMap + i);
-	*/
 
 	kdtree = new KDTree(photons);
 
