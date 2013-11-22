@@ -10,6 +10,7 @@ class Sphere : public Object {
 	Vect center;
 	double radius;
 	Color color;
+	float refraIdx;
 public:
 	Sphere();
 	Sphere(Vect, double, Color);
@@ -76,6 +77,7 @@ Sphere::Sphere(){
 	center = Vect(0,0,0);
 	radius = 1.0;
 	color = Color(0.5,0.5,0.5,0);
+	refraIdx = 1.0;
 }
 
 Sphere::Sphere(Vect centerValue, double radiusValue, Color colorValue){
