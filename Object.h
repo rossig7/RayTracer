@@ -16,6 +16,7 @@ public:
 	}
 
 	virtual Vect getNormalAt(Vect point) = 0;
+	virtual float getRefraIdx() {return 1;}
 };
 
 Object::Object(){}

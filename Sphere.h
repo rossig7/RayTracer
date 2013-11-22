@@ -13,7 +13,7 @@ class Sphere : public Object {
 	float refraIdx;
 public:
 	Sphere();
-	Sphere(Vect, double, Color);
+	Sphere(Vect, double, Color, float);
 
 	virtual Vect getSphereCenter(){return center;}
 	virtual double getSphereRadius(){return radius;}
@@ -23,6 +23,8 @@ public:
 		Vect normal_Vect = point.vectAdd(center.negtive()).normalize();
 		return normal_Vect;
 	}
+
+	virtual float getRefraIdx() {return refraIdx;};
 	
 	virtual double findIntersection(Ray ray){
 		Vect ray_direction = ray.getRayDirection();
@@ -80,10 +82,11 @@ Sphere::Sphere(){
 	refraIdx = 1.0;
 }
 
-Sphere::Sphere(Vect centerValue, double radiusValue, Color colorValue){
+Sphere::Sphere(Vect centerValue, double radiusValue, Color colorValue, float refraIdxValue){
 	center = centerValue;
 	radius = radiusValue;
 	color = colorValue;
+	refraIdx = refraIdxValue;
 }
 
 #endif

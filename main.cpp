@@ -35,8 +35,8 @@
 
 using namespace std;
 
-int storedPhotonMum = 0;
 vector<Photon *> photons;
+vector<Object *> scene_objects;
 
 KDTree *kdtree;
 
@@ -306,7 +306,20 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 	return final_color.clip();
 }
 
-vector<Object *> scene_objects;
+double FresnelEquation(float cosThetaI, float n1, float n2, int type){
+	// type: 0:reflectance, 1:refractance
+	float sin2ThetaT = (n1/n2)*(n1/n2)*(1-cosThetaI*cosThetaI);
+	float cosThetaT = sqrt(1-sin2ThetaT);
+
+	float Rspolarize = (n1*cosThetaI - n2*cosThetaT) / (n1*cosThetaI + n2*cosThetaT);
+	float Rppolarize = (n2*cosThetaI - n1*cosThetaT) / (n2*cosThetaI + n1*cosThetaT);
+
+	if (type == 0)
+		return (Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
+	else
+		return 1-(Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
+}
+
 
 void makeCube(Vect corner1, Vect corner2, Color color)
 {
@@ -445,8 +458,8 @@ int main(int argc, char *argv[])
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 
-	Sphere scene_sphere (new_sphere_pos, 0.3, pretty_green);
-	Sphere scene_sphere2 (new_sphere_pos2, 0.3, orange);
+	Sphere scene_sphere (new_sphere_pos, 0.3, pretty_green, 220);
+	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite, 1.5);
 	Plane scene_plane(Y, -1, maroon);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange);
 
@@ -505,19 +518,34 @@ int main(int argc, char *argv[])
 			if (intersections.at(index_of_winning_object) > accuracy) {
 				Vect intersection_position = photon_ray.getRayOrigin().vectAdd(photon_ray_direction.vectMult(intersections.at(index_of_winning_object)));
 				Vect intersecting_ray_direction = photon_ray_direction;
+				Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+
+				float reflectance = 1;
 
 				if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() == 0) {
 					lightColor = storePhoton(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientLight, lightColor, bounce);
+					reflectance = 0.8;
+				}
+				else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
+					float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+					float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
+
+					reflectance = FresnelEquation(cosTheta, 1, n2, 0);
+				}
+				else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 2) {
+					float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+					float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
+
+					reflectance = FresnelEquation(cosTheta, 1, n2, 1);
 				}
 
 				int roll = rand() % 100;
-				if (roll < 20) {   // absorb rate of 0.2. TODO: add absorb/refraction/refration rate
+				if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
 					break;
 				}
 				else {
 					if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
 						lightColor = lightColor.colorScalar(0.7);
-						Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
 						double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive()); // N*L
 						Vect scalar1 = winning_object_normal.vectMult(dot1); // (N*L)*N
 						Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
@@ -530,8 +558,7 @@ int main(int argc, char *argv[])
 					}
 					else {
 						lightColor = lightColor.colorScalar(1);
-						Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
-						double n1n2 = 1.0 / 1.5;
+						double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
 						double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 
 						if (dot1 < 0) {
