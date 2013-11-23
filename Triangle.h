@@ -11,9 +11,10 @@ class Triangle : public Object {
 	double distance;
 	Color color;
 	Vect A, B, C;
+	float refraIdx;
 public:
 	Triangle();
-	Triangle(Vect, Vect, Vect, Color);
+	Triangle(Vect, Vect, Vect, Color, float);
 
 	virtual Vect getTriangleNormal() {
 		Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
@@ -33,6 +34,8 @@ public:
 		normal = getTriangleNormal();
 		return normal;		
 	}
+
+	virtual float getRefraIdx() {return refraIdx;};
 
 	virtual double findIntersection(Ray ray){
 		Vect ray_direction = ray.getRayDirection();
@@ -87,13 +90,15 @@ Triangle::Triangle(){
 	C = Vect (0,0,1);
 	distance = 0;
 	color = Color(0.5,0.5,0.5,0);
+	refraIdx = 1;
 }
 
-Triangle::Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue){
+Triangle::Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue, float refraIdxValue){
 	A = pointA;
 	B = pointB;
 	C = pointC;
 	color = colorValue;
+	refraIdx = refraIdxValue;
 }
 
 #endif
