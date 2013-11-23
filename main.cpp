@@ -386,8 +386,22 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		}
 
 		if (canTransmit) {
-			if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
-				lightColor = lightColor.colorScalar(0.7);
+			if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() == 0) {  // Lambert model
+				double Zeta1 = (rand()%100)/100.0;
+				double Zeta2 = (rand()%100)/100.0;
+
+				double theta = 1 / cos(sqrt(Zeta1));
+				double phi = 2 * PI * Zeta2;
+
+				Vect reflection_dir(sin(phi)*cos(theta), sin(phi)*sin(theta), cos(phi));
+				reflection_dir = reflection_dir.normalize();
+
+				photon_ray = Ray(intersection_position, reflection_dir);
+				photon_ray_direction = reflection_dir;
+				photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce+1);		
+			}
+			else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
+				//lightColor = lightColor.colorScalar(0.7);
 				double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive()); // N*L
 				Vect scalar1 = winning_object_normal.vectMult(dot1); // (N*L)*N
 				Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
