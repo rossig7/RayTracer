@@ -27,9 +27,9 @@
 #include "Photon.h"
 #include "Kdtree.h"
 
-//NOTICE: a good value pair would be (50000,1000) or (250000, 10000)(very slow), to large PHOTONMUM/PHOTONUSE will produce spotty result
-#define PHOTONMUM 50000 
-#define PHOTONUSE 1000
+/*NOTICE: a good value pair would be (50000,1200), too large PHOTONMUM/PHOTONUSE will produce spotty result, too small will produce over-blurred shadow*/
+#define PHOTONMUM 50000
+#define PHOTONUSE 1200
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -37,7 +37,8 @@
 #define FRESNEL
 #define TRACING_DEPTH 4  // Depth must >= 4
 //#define GLOSSY
-#define GLOSSY_SAMPLE 64
+/*define GLOSSY will enable glossy reflection and refraction for both balls in the scene. VERY SLOW*/
+#define GLOSSY_SAMPLE 16
 
 using namespace std;
 
@@ -194,6 +195,25 @@ Vect computeReflectionDir(Vect winning_object_normal, Vect intersecting_ray_dire
 	return add2.normalize();
 }
 
+Vect computeGlossyRay(Vect reflection_direction, Vect winning_object_normal, double glossiness) {
+	double a = dis_rand(gen);
+	double b = dis_rand(gen);
+
+	double theta = acos(pow(1-a, glossiness));
+	double phi = 2 * PI * b;
+
+	double x = sin(theta) * cos(phi);
+	double z = sin(theta) * sin(phi);
+	//double z = cos(theta);		
+
+	Vect u = reflection_direction.crossProduct(winning_object_normal);
+	Vect v = reflection_direction.crossProduct(u);
+
+	Vect world_ref_ray_dir = u.vectMult(x).vectAdd(v.vectMult(z).vectAdd(reflection_direction));
+	
+	return world_ref_ray_dir.normalize();
+}
+
 Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, int depth)
 {
 	Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
@@ -203,133 +223,106 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 	if (depth > TRACING_DEPTH) return final_color.clip();
 
 
-	if (winning_object_color.getColorSpecial() > 0) {
+	if (winning_object_color.getColorSpecial() > 0) {  // have reflection
 		Vect reflection_direction = computeReflectionDir(winning_object_normal, intersecting_ray_direction);
 
+		double sample;
+		double sampledGlossyReflectColor = 0;
+		Color sampleGlossyReflectColor(0,0,0,0);
+		double colorSpecial = winning_object_color.getColorSpecial();
 
-		if (winning_object_color.getColorSpecial() != 0.987654321) {
-			Ray reflection_ray(intersection_position, reflection_direction);
+		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001) 
+			sample = GLOSSY_SAMPLE;
+		else sample = 1;
+
+		for (int i = 0; i < sample; i ++) {
+			Vect world_ref_ray_dir;
+			if (sample != 1)
+				world_ref_ray_dir = computeGlossyRay(reflection_direction, winning_object_normal, 0.2);
+			else
+				world_ref_ray_dir = reflection_direction;
+
+			Ray reflection_ray(intersection_position, world_ref_ray_dir);
 			vector<double> reflection_intersections;
-	
+
 			for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
 				reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
 			}
-	
+
 			int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
 			if (index_of_winning_object_reflection != -1) {
 				//no miss
 				if (reflection_intersections.at(index_of_winning_object_reflection) > accuracy) {
 					Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
 					Vect reflection_intersection_direction = reflection_direction;
-	
+
 					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
-	
+
 					if (winning_object_color.getColorSpecial() > 1) 
-						final_color = final_color.colorAdd(reflection_intersection_color.colorScalar(2 - winning_object_color.getColorSpecial()));
+						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - winning_object_color.getColorSpecial()));
 					else
-						final_color = final_color.colorAdd(reflection_intersection_color);
+						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color);
+					sampledGlossyReflectColor++;
 				}
 			}
 		}
+		sampleGlossyReflectColor = sampleGlossyReflectColor.colorScalar(1.0/sample);
+		final_color = final_color.colorAdd(sampleGlossyReflectColor);
 
-		else {
-			double sample = GLOSSY_SAMPLE;
-			double sampledColor = 0;
-			Color sampleColor(0,0,0,0);
+		if (winning_object_color.getColorSpecial() > 1) { // have reflection and refraction
+			double sampledGlossyRefractColor = 0;
+			Color sampleGlossyRefractColor(0,0,0,0);
 
 			for (int i = 0; i < sample; i ++) {
-				double a = dis_rand(gen);
-				double b = dis_rand(gen);
-	
-				double theta = acos(pow(1-a, 0.2));
-				double phi = 2 * PI * b;
-				
-				double x = sin(theta) * cos(phi);
-				double z = sin(theta) * sin(phi);
-				//double z = cos(theta);		
-	
-				Vect u = reflection_direction.crossProduct(winning_object_normal);
-				Vect v = reflection_direction.crossProduct(u);
-	
-				Vect world_ref_ray_dir = u.vectMult(x).vectAdd(v.vectMult(z).vectAdd(reflection_direction));
-	
-				Ray reflection_ray(intersection_position, world_ref_ray_dir.normalize());
-				
-	
-				vector<double> reflection_intersections;
-	
-				for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-					reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
+				Vect world_ref_ray_dir;
+
+				double refractance = winning_object_color.getColorSpecial() - 1;
+
+				double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
+				double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+
+				if (dot1 < 0) {
+					winning_object_normal = winning_object_normal.negtive();
+					dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+					n1n2 = 1.0 / n1n2;
 				}
-	
-				int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
-				if (index_of_winning_object_reflection != -1) {
-					//no miss
-					if (reflection_intersections.at(index_of_winning_object_reflection) > accuracy) {
-						Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
-						Vect reflection_intersection_direction = reflection_direction;
-	
-						Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
-	
-						if (winning_object_color.getColorSpecial() > 1) 
-							sampleColor = sampleColor.colorAdd(reflection_intersection_color.colorScalar(2 - winning_object_color.getColorSpecial()));
-						else
-							sampleColor = sampleColor.colorAdd(reflection_intersection_color);
-						sampledColor++;
+
+				double nNL = n1n2 * dot1;  //n*NL
+				double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
+
+				if (underSQRT > 0) {
+					double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
+					Vect reflection_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+
+					if (sample != 1)
+						world_ref_ray_dir = computeGlossyRay(reflection_direction, winning_object_normal, 0.2);
+					else
+						world_ref_ray_dir = reflection_direction;
+
+					Ray reflection_ray(intersection_position, world_ref_ray_dir);
+
+					vector<double> reflection_intersections;
+					for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
+						reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
+					}
+					int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
+
+					if (index_of_winning_object_reflection != -1) {
+						//no miss
+						double intersect = reflection_intersections.at(index_of_winning_object_reflection);
+						if (intersect > accuracy) {
+							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
+							Vect reflection_intersection_direction = reflection_direction;
+
+							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
+
+							sampleGlossyRefractColor = sampleGlossyRefractColor.colorAdd(reflection_intersection_color.colorScalar(refractance));
+							sampledGlossyRefractColor++;
+						}
 					}
 				}
-			}
-			/*
-			if (sampledColor!=0) {
-				sampleColor = sampleColor.colorScalar(1.0/sampledColor);
-				final_color = final_color.colorAdd(sampleColor);
-			}*/
-			sampleColor = sampleColor.colorScalar(1.0/sample);
-			final_color = final_color.colorAdd(sampleColor);
-		}
-
-
-		if (winning_object_color.getColorSpecial() > 1) {
-			double refractance = winning_object_color.getColorSpecial() - 1;
-
-			double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
-			double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
-
-			if (dot1 < 0) {
-				winning_object_normal = winning_object_normal.negtive();
-				dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-				n1n2 = 1.0 / n1n2;
-			}
-
-			double nNL = n1n2 * dot1;  //n*NL
-			double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
-
-			if (underSQRT > 0) {
-				double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-				Vect reflection_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
-
-				//Ray reflection_ray(intersection_position, reflection_direction);
-				Ray reflection_ray(intersection_position.vectAdd(intersecting_ray_direction.vectMult(0)), reflection_direction);
-
-				//determine what the ray intersects first
-				vector<double> reflection_intersections;
-				for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-					reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
-				}
-				int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
-
-				if (index_of_winning_object_reflection != -1) {
-					//no miss
-					double intersect = reflection_intersections.at(index_of_winning_object_reflection);
-					if (intersect > accuracy) {
-						Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
-						Vect reflection_intersection_direction = reflection_direction;
-
-						Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
-
-						final_color = final_color.colorAdd(reflection_intersection_color.colorScalar(refractance));
-					}
-				}
+				sampleGlossyRefractColor = sampleGlossyRefractColor.colorScalar(1.0/sample);
+				final_color = final_color.colorAdd(sampleGlossyRefractColor);
 			}
 		}
 	}
@@ -432,7 +425,6 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 				canTransmit = false;
 			}
 			*/
-			//canTransmit = false;
 		}
 		else if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() < 1) {
 			float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
@@ -676,16 +668,17 @@ int main(int argc, char *argv[])
 	Color white_light (1.0, 1.0, 1.0, 0.0);
 	//Color pretty_green (0.5,1.0,0.5,0.3);
 #ifdef GLOSSY 
-	Color reflectWhite (1.0, 1.0, 1.0, 0.987654321);
+	Color reflectWhite (1.0, 1.0, 1.0, 0.987654);
+	Color refractWhite(1.0, 1.0, 1.0, 1.887654);
 #else
 	Color reflectWhite (1.0, 1.0, 1.0, 0.9);
+	Color refractWhite (1.0, 1.0, 1.0, 1.8);
 #endif
 	Color maroon(0.5, 0.25, 0.25, 2);
 	Color pretty_maroon(0.5, 0.25, 0.25, 0.6);
 	Color gray(0.5, 0.5, 0.5, 0);
 	Color black(0.0, 0.0, 0.0, 0);
 	Color orange(0.94, 0.75, 0.31, 0);
-	Color refractWhite(1.0, 1.0, 1.0, 1.8);
 
 	Vect light_position(0.1, 0.2, 0);
 	Light scene_light (light_position, white_light);
@@ -698,12 +691,10 @@ int main(int argc, char *argv[])
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange, 20);
 
 	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
-	//scene_objects.push_back(dynamic_cast<Object*>(&scene_plane));
 	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
-	//scene_objects.push_back(dynamic_cast<Object*>(&scene_triangle));
 
 	makeCornellBox(Vect(1, 1, 1), Vect(-1, -1, -1));
-	//makeCube(Vect (0.5,0,0.5), Vect (-0.5,-1,-0.5), pretty_green);
+
 
 	int thisone, aa_index;
 	double xamnt, yamnt;  //dafuq?
