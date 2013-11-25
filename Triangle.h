@@ -34,6 +34,10 @@ public:
 		normal = getTriangleNormal();
 		return normal;		
 	}
+	virtual Vect getTangentAt(Vect point){
+		Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
+		return CA.normalize();
+	}
 
 	virtual float getRefraIdx() {return refraIdx;};
 

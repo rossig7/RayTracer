@@ -25,6 +25,10 @@ public:
 	}
 
 	virtual float getRefraIdx() {return refraIdx;};
+
+	virtual Vect getTangentAt(Vect point){
+		return Vect(1,0,0);
+	}
 	
 	virtual double findIntersection(Ray ray){
 		Vect ray_direction = ray.getRayDirection();

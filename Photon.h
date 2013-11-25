@@ -9,9 +9,6 @@ public:
 	Vect position;
 	Color power;
 	char phi, theta;
-	short flag;
-	int used;
-	int bounce;
 	Vect dir;
 
 	Photon(){
@@ -19,7 +16,6 @@ public:
 		power = Color(0,0,0,0);
 		phi = 0;
 		theta = 0;
-		used = 0;
 	}
 
 	Photon(Vect pPos, Color pPower, char pPhi, char pTheta, Vect pDir){
@@ -27,7 +23,6 @@ public:
 		power = pPower;
 		phi = pPhi;
 		theta = pTheta;
-		used = 0;
 		dir = pDir;
 	}
 };

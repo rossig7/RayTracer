@@ -16,6 +16,7 @@ public:
 	}
 
 	virtual Vect getNormalAt(Vect point) = 0;
+	virtual Vect getTangentAt(Vect point) = 0;
 	virtual float getRefraIdx() {return 1;}
 };
 
