@@ -28,8 +28,8 @@
 #include "Kdtree.h"
 
 //NOTICE: a good value pair would be (50000,1000) or (250000, 10000)(very slow), to large PHOTONMUM/PHOTONUSE will produce spotty result
-#define PHOTONMUM 250000 
-#define PHOTONUSE 10000
+#define PHOTONMUM 50000 
+#define PHOTONUSE 1000
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -37,6 +37,7 @@
 #define FRESNEL
 #define TRACING_DEPTH 4  // Depth must >= 4
 //#define GLOSSY
+#define GLOSSY_SAMPLE 64
 
 using namespace std;
 
@@ -232,7 +233,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		}
 
 		else {
-			double sample = 64;
+			double sample = GLOSSY_SAMPLE;
 			double sampledColor = 0;
 			Color sampleColor(0,0,0,0);
 
@@ -641,11 +642,11 @@ int main(int argc, char *argv[])
 	t1 = clock();
 
 	int dpi = 72;
-	int width = 480;
-	int height = 480;
+	int width = 512;
+	int height = 512;
 	int n = width * height;
 
-	int aadepth = 2;
+	int aadepth = 1;
 	double aathreshold = .1;
 	double aspectRatio = (double) width / (double) height;
 	double ambientLight = 0;
