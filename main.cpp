@@ -234,7 +234,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		Color sampleGlossyReflectColor(0,0,0,0);
 		double colorSpecial = winning_object_color.getColorSpecial();
 
-		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001 && colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 > 0) 
+		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001 && colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7653 > 0) 
 			sample = GLOSSY_SAMPLE;
 		else sample = 1;
 
