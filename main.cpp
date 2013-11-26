@@ -38,9 +38,15 @@
 #define NATUREE 2.71828
 #define FRESNEL
 #define TRACING_DEPTH 4  // Depth must >= 4
-//#define GLOSSY
+
 /*define GLOSSY will enable glossy reflection and refraction for both balls in the scene. VERY SLOW*/
+//#define GLOSSY
 #define GLOSSY_SAMPLE 16
+
+/*set DOF_SAMPLE to 1 to disable depth of field. To enable set a value larger than 128 is recommended*/
+#define DOF_SAMPLE 1
+#define FOCAL_LEN 2.6
+#define APERTURE_SIZE 0.2
 
 using namespace std;
 
@@ -50,6 +56,7 @@ vector<Object *> scene_objects;
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis_rand(0, 1);
+std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
 struct RGBType {
 	double r;
@@ -655,7 +662,7 @@ int main(int argc, char *argv[])
 	Vect Z (0, 0, 1);
 
 	Vect new_sphere_pos (0.3, -0.7, -0.4);
-	Vect new_sphere_pos2 (0.3, -0.7, 0.4);
+	Vect new_sphere_pos2 (-0.3, -0.7, 0.4);
 
 	Vect camPos(2.8, 0, 0);
 
@@ -702,8 +709,6 @@ int main(int argc, char *argv[])
 	float diffPrep = ((float) tPrep - (float) t1) / CLOCKS_PER_SEC;
 	cout << diffPrep << "seconds" << endl;
 	cout << "start emit photons..." << endl;
-
-	srand(0);
 
 	std::uniform_real_distribution<> dis(-1, 1);
 	//Color lightColor = white_light.colorScalar(32.0/PHOTONMUM);
@@ -802,35 +807,57 @@ int main(int argc, char *argv[])
 					Vect cam_ray_origin = scene_cam.getCameraPosition();
 					Vect cam_ray_direction = camDir.vectAdd(camRight.vectMult(xamnt - 0.5).vectAdd(camDown.vectMult(yamnt - 0.5))).normalize();
 
-					Ray cam_ray (cam_ray_origin, cam_ray_direction);
+					Vect focalPoint = cam_ray_origin.vectAdd(cam_ray_direction.vectMult(FOCAL_LEN));
+					Vect worldUp(0, 1, 0);
+					Vect camUp = worldUp.vectAdd(cam_ray_direction.vectMult(worldUp.dotProduct(cam_ray_direction)).negtive());
+					Vect camSide = camUp.crossProduct(cam_ray_direction);
 
-					vector<double> intersections;
+					
 
-					for (int index = 0; index < scene_objects.size(); index++) {
-						intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
-					}
+					double dofColor[3] = {0,0,0};
 
-					int index_of_winning_object = winningObjectIndex(intersections);
+					for (int d = 0; d < DOF_SAMPLE; d++) {
+						Ray cam_ray (cam_ray_origin, cam_ray_direction);
 
-					//cout << index_of_winning_object;
+						if (DOF_SAMPLE != 1) {
+							double x = dis_rand_dof(gen);
+							double y = dis_rand_dof(gen);
+						
+							Vect camPosDoF = cam_ray_origin.vectAdd(camUp.vectMult(x)).vectAdd(camSide.vectMult(y));
+							Vect camDirDoF = focalPoint.vectAdd(camPosDoF.negtive()).normalize();
 
-					if (index_of_winning_object == -1) {
-						tempRed[aa_index] = 0;
-						tempGreen[aa_index] = 0;
-						tempBlue[aa_index] = 0;
-					}
-					else {
-						if (intersections.at(index_of_winning_object) > accuracy) {
-							Vect intersection_position = cam_ray.getRayOrigin().vectAdd(cam_ray_direction.vectMult(intersections.at(index_of_winning_object)));
-							Vect intersecting_ray_direction = cam_ray_direction;
-
-							Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, 1, KDTreeSet.at(omp_get_thread_num()));
-
-							tempRed[aa_index] = intersection_color.getColorRed();
-							tempGreen[aa_index] = intersection_color.getColorGreen();
-							tempBlue[aa_index] = intersection_color.getColorBlue();
+							cam_ray = Ray(camPosDoF, camDirDoF);
+						}
+	
+						vector<double> intersections;
+	
+						for (int index = 0; index < scene_objects.size(); index++) {
+							intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
+						}
+	
+						int index_of_winning_object = winningObjectIndex(intersections);
+	
+						if (index_of_winning_object == -1) {
+							dofColor[0] += 0;
+							dofColor[1] += 0;
+							dofColor[2] += 0;
+						}
+						else {
+							if (intersections.at(index_of_winning_object) > accuracy) {
+								Vect intersection_position = cam_ray.getRayOrigin().vectAdd(cam_ray_direction.vectMult(intersections.at(index_of_winning_object)));
+								Vect intersecting_ray_direction = cam_ray_direction;
+	
+								Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, 1, KDTreeSet.at(omp_get_thread_num()));
+	
+								dofColor[0] += intersection_color.getColorRed();
+								dofColor[1] += intersection_color.getColorGreen();
+								dofColor[2] += intersection_color.getColorBlue();
+							}
 						}
 					}
+					tempRed[aa_index] = dofColor[0]/DOF_SAMPLE;
+					tempGreen[aa_index] = dofColor[1]/DOF_SAMPLE;
+					tempBlue[aa_index] = dofColor[2]/DOF_SAMPLE;
 				}
 				//delete tempRed, tempGreen, tempBlue;
 			}
