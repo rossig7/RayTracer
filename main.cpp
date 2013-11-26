@@ -27,6 +27,8 @@
 #include "Photon.h"
 #include "Kdtree.h"
 
+#include <omp.h>
+
 /*NOTICE: a good value pair would be (50000,1200), too large PHOTONMUM/PHOTONUSE will produce spotty result, too small will produce over-blurred shadow*/
 #define PHOTONMUM 50000
 #define PHOTONUSE 1200
@@ -44,8 +46,6 @@ using namespace std;
 
 vector<Photon *> photons;
 vector<Object *> scene_objects;
-
-KDTree *kdtree;
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -181,7 +181,10 @@ Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, v
 	char theta = 0;
 
 	Photon* currentPhoton  = new Photon(intersection_position, lightColor, phi, theta, intersecting_ray_direction);
-	photons.push_back(currentPhoton);
+#pragma omp critical
+	{
+		photons.push_back(currentPhoton);
+	}
 	return final_color.clip();
 }
 
@@ -214,7 +217,7 @@ Vect computeGlossyRay(Vect reflection_direction, Vect winning_object_normal, dou
 	return world_ref_ray_dir.normalize();
 }
 
-Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, int depth)
+Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, int depth, KDTree* kdtree)
 {
 	Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
 	Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
@@ -231,7 +234,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		Color sampleGlossyReflectColor(0,0,0,0);
 		double colorSpecial = winning_object_color.getColorSpecial();
 
-		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001) 
+		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001 && colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 > 0) 
 			sample = GLOSSY_SAMPLE;
 		else sample = 1;
 
@@ -256,7 +259,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 					Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
 					Vect reflection_intersection_direction = reflection_direction;
 
-					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
+					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1, kdtree);
 
 					if (winning_object_color.getColorSpecial() > 1) 
 						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - winning_object_color.getColorSpecial()));
@@ -314,7 +317,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
 							Vect reflection_intersection_direction = reflection_direction;
 
-							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
+							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1, kdtree);
 
 							sampleGlossyRefractColor = sampleGlossyRefractColor.colorAdd(reflection_intersection_color.colorScalar(refractance));
 							sampledGlossyRefractColor++;
@@ -630,7 +633,7 @@ int main(int argc, char *argv[])
 {
 	cout << "rendering..." << endl << "Preparing Scene..." << endl;
 
-	clock_t t1, t2, tPrep, tTracing;
+	clock_t t1, t2, tPrep, tPhoton, tTracing;
 	t1 = clock();
 
 	int dpi = 72;
@@ -695,57 +698,60 @@ int main(int argc, char *argv[])
 
 	makeCornellBox(Vect(1, 1, 1), Vect(-1, -1, -1));
 
-
-	int thisone, aa_index;
-	double xamnt, yamnt;  //dafuq?
-	double tempRed, tempGreen, tempBlue;
-
 	tPrep = clock();
 	float diffPrep = ((float) tPrep - (float) t1) / CLOCKS_PER_SEC;
 	cout << diffPrep << "seconds" << endl;
-
 	cout << "start emit photons..." << endl;
 
-
-	int pn = 0;
-	double x, y, z;
-
 	srand(0);
-
 
 	std::uniform_real_distribution<> dis(-1, 1);
 	//Color lightColor = white_light.colorScalar(32.0/PHOTONMUM);
 	Color lightColor = white_light;
 
-	while (pn < PHOTONMUM) {
-		do {
-			//x = rand()/ (double)(RAND_MAX/2) - 1;
-			//y = rand()/ (double)(RAND_MAX/2) - 1;
-			//z = rand()/ (double)(RAND_MAX/2) - 1;
-			x = dis(gen);
-			y = dis(gen);
-			z = dis(gen);
-		} while (x * x + y * y + z * z > 1);
+	int procNum = omp_get_num_procs();
 
-		Vect photon_ray_direction(x, y, z);
-		photon_ray_direction = photon_ray_direction.normalize();
-
-		Ray photon_ray (light_position, photon_ray_direction);
-
-		int bounce = 0;
-		photonEmission(photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce);
-
-		pn++;
+#pragma omp parallel for
+	for (int t = 0; t < procNum; t++) {
+		int pn = 0;
+		while (pn < PHOTONMUM/procNum) {
+			double x, y, z;
+			do {
+				x = dis(gen);
+				y = dis(gen);
+				z = dis(gen);
+			} while (x * x + y * y + z * z > 1);
+	
+			Vect photon_ray_direction(x, y, z);
+			photon_ray_direction = photon_ray_direction.normalize();
+	
+			Ray photon_ray (light_position, photon_ray_direction);
+	
+			int bounce = 0;
+			photonEmission(photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce);
+	
+			pn++;
+		}
 	}
 
-	kdtree = new KDTree(photons);
+	//kdtree = new KDTree(photons);
+	vector<KDTree*> KDTreeSet;
 
+	for (int t = 0; t < procNum; t++) {
+		KDTreeSet.push_back(new KDTree(photons));
+	}
 
+	tPhoton = clock();
+	float diffPhoton = ((float) tPhoton - (float) tPrep) / CLOCKS_PER_SEC;
+	cout << diffPhoton << "seconds" << endl;
 	cout << "start ray tracing..." << endl;
 
 	for (int x = 0; x < width; x++) {
+#pragma omp parallel for
 		for (int y = 0; y < height; y++) {
-			thisone = y * width + x;
+			int thisone = y * width + x;
+			int aa_index;
+			double xamnt, yamnt;  //dafuq?
 
 			//start with black pix
 			double *tempRed = new double [aadepth * aadepth];
@@ -756,8 +762,6 @@ int main(int argc, char *argv[])
 				for (int aay = 0; aay < aadepth; aay++) {
 
 					aa_index = aay * aadepth + +aax;
-
-					srand(time(0));
 
 					if (aadepth == 1) {
 						// no anti aliasing
@@ -820,7 +824,7 @@ int main(int argc, char *argv[])
 							Vect intersection_position = cam_ray.getRayOrigin().vectAdd(cam_ray_direction.vectMult(intersections.at(index_of_winning_object)));
 							Vect intersecting_ray_direction = cam_ray_direction;
 
-							Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, 1);
+							Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, 1, KDTreeSet.at(omp_get_thread_num()));
 
 							tempRed[aa_index] = intersection_color.getColorRed();
 							tempGreen[aa_index] = intersection_color.getColorGreen();
@@ -863,12 +867,12 @@ int main(int argc, char *argv[])
 	saveBmp("scene.bmp", width, height, dpi, pixels);
 	cout << "Finished" << endl;
 
-	delete pixels, tempRed, tempGreen, tempBlue;;
+	//delete pixels, tempRed, tempGreen, tempBlue;;
 
 	t2 = clock();
 	float diff = ((float) t2 - (float) t1) / CLOCKS_PER_SEC;
 
-	delete kdtree;
+	//delete kdtree;
 	cout << diff << "seconds" << endl;
 
 	system("pause");
