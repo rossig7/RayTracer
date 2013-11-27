@@ -6,6 +6,7 @@
 #include <cmath>
 #include <limits>
 #include <queue>
+#include <mutex>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -27,7 +28,7 @@
 #include "Triangle.h"
 #include "Photon.h"
 #include "Kdtree.h"
-
+#include "ObjReader.h"
 
 std::mutex photon_mtx;
 
@@ -698,13 +699,16 @@ int main(int argc, char *argv[])
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 
+	ObjReader* objReader = new ObjReader("teapot1.obj", reflectWhite, 220, 0.3, -0.5, 0);
+	objReader->ReadContent(&scene_objects);
+
 	Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
 	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite, 1.5);
 	//Plane scene_plane(Y, -1, maroon);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange, 20);
 
-	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
-	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
+	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
+	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
 
 	makeCornellBox(Vect(1, 1, 1), Vect(-1, -1, -1));
 

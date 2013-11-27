@@ -83,7 +83,7 @@ public:
 				return -1;
 			}
 
-			return -1*b/a;
+			return -1*b/a - 0.000001;
 		}
 	}
 };
