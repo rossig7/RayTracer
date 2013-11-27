@@ -39,11 +39,11 @@ private:
 	int perf_count;
 	static const int max_elements = 3;
 	KDNode *Root;
-	priority_queue<Photon *, vector<Photon *>, distanceComparsion> *KNN_queue;
 
 	void destroyKD_(KDNode *parent);
 	void createKD_(vector<Photon *> &photons, KDNode *parent);
-	void findKNN_(int k, Vect center, KDNode *root);
+	void findKNN_(int k, Vect center, KDNode *root,
+            priority_queue<Photon *, vector<Photon *>, distanceComparsion>& KNN_queue );
 	KDTree()
 	{
 		perf_count = 0;

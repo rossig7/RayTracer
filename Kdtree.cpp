@@ -99,7 +99,8 @@ void KDTree::destroyKD_(KDNode *parent)
 	delete parent;
 }
 
-void KDTree::findKNN_(int k, Vect center, KDNode *root)
+void KDTree::findKNN_(int k, Vect center, KDNode *root,
+        priority_queue<Photon *, vector<Photon *>, distanceComparsion>& KNN_queue)
 {
 	/*
 	Photon * topPhoton = KNN_queue->top();
@@ -108,58 +109,58 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root)
 
 	for (int i = 0; i < root->left.size(); i++) {
 		//perf_count++;
-		if (KNN_queue->size() < k &&
+		if (KNN_queue.size() < k &&
 				root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->left[i]);
+			KNN_queue.push(root->left[i]);
 			continue;
 		}
 		float dis = 1e3;
-		if (KNN_queue->size() > 0) {
-			Photon *topPhoton = KNN_queue->top();
+		if (KNN_queue.size() > 0) {
+			Photon *topPhoton = KNN_queue.top();
 			dis = topPhoton->position.sqrDist(center);
 		}
 		if (root->left[i]->position.sqrDist(center) < dis
 				&& root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->left[i]);
-			KNN_queue->pop();
+			KNN_queue.push(root->left[i]);
+			KNN_queue.pop();
 		}
 	}
 
 	for (int i = 0; i < root->right.size(); i++) {
 		//perf_count++;
-		if (KNN_queue->size() < k &&
+		if (KNN_queue.size() < k &&
 				root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->right[i]);
+			KNN_queue.push(root->right[i]);
 			continue;
 		}
 		float dis = 1e3;
-		if (KNN_queue->size() > 0) {
-			Photon *topPhoton = KNN_queue->top();
+		if (KNN_queue.size() > 0) {
+			Photon *topPhoton = KNN_queue.top();
 			dis = topPhoton->position.sqrDist(center);
 		}
 		if (root->right[i]->position.sqrDist(center) < dis
 				&& root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->right[i]);
-			KNN_queue->pop();
+			KNN_queue.push(root->right[i]);
+			KNN_queue.pop();
 		}
 	}
 
 	// Pivot Self
 	// perf_count++;
-	if (KNN_queue->size() < k &&
+	if (KNN_queue.size() < k &&
 			root->self->position.sqrDist(center) < PHOTONDIST) {
-		KNN_queue->push(root->self);
+		KNN_queue.push(root->self);
 	}
 	else {
 		float dis = 1e3;
-		if (KNN_queue->size() > 0) {
-			Photon *topPhoton = KNN_queue->top();
+		if (KNN_queue.size() > 0) {
+			Photon *topPhoton = KNN_queue.top();
 			dis = topPhoton->position.sqrDist(center);
 		}
 		if (root->self->position.sqrDist(center) < dis &&
 				root->self->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue->push(root->self);
-			KNN_queue->pop();
+			KNN_queue.push(root->self);
+			KNN_queue.pop();
 		}
 	}
 
@@ -183,11 +184,11 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root)
 
 	if (is_left_first) {
 		if (root->left_branch) {
-			findKNN_(k, center, root->left_branch);
+			findKNN_(k, center, root->left_branch, KNN_queue);
 		}
 		float dis = 1e3;
-		if (KNN_queue->size() > 0) {
-			Photon *topPhoton = KNN_queue->top();
+		if (KNN_queue.size() > 0) {
+			Photon *topPhoton = KNN_queue.top();
 			dis = topPhoton->position.sqrDist(center);
 		}
 		float farDistance = min(PHOTONDIST * PHOTONDIST * 1., dis * 1.);
@@ -206,17 +207,17 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root)
 		        break;
 		}
 		if (need_other && root->right_branch) {
-			findKNN_(k, center, root->right_branch);
+			findKNN_(k, center, root->right_branch, KNN_queue);
 		}
 	}
 	else {
 		if (root->right_branch) {
-			findKNN_(k, center, root->right_branch);
+			findKNN_(k, center, root->right_branch, KNN_queue);
 		}
 
 		float dis = 1e3;
-		if (KNN_queue->size() > 0) {
-			Photon *topPhoton = KNN_queue->top();
+		if (KNN_queue.size() > 0) {
+			Photon *topPhoton = KNN_queue.top();
 			dis = topPhoton->position.sqrDist(center);
 		}
 		float farDistance = min(PHOTONDIST * PHOTONDIST * 1., dis * 1.);
@@ -236,7 +237,7 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root)
 		}
 
 		if (need_other && root->left_branch) {
-			findKNN_(k, center, root->left_branch);
+			findKNN_(k, center, root->left_branch, KNN_queue);
 		}
 
 	}
@@ -244,18 +245,17 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root)
 
 vector<Photon *> KDTree::findKNN(int k, Vect center)
 {
-	KNN_queue = new priority_queue<Photon *, vector<Photon *>, distanceComparsion>
+    auto KNN_queue = priority_queue<Photon *, vector<Photon *>, distanceComparsion>
 			(distanceComparsion(center));
 
-	findKNN_(k, center, Root);
+	findKNN_(k, center, Root, KNN_queue);
 
 	vector<Photon *> result;
-	while (KNN_queue->size() > 0) {
-		result.push_back(KNN_queue->top());
-		KNN_queue->pop();
+	while (KNN_queue.size() > 0) {
+		result.push_back(KNN_queue.top());
+		KNN_queue.pop();
 	}
 	reverse(result.begin(), result.end());
-	delete KNN_queue;
 	return result;
 }
 
