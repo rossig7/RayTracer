@@ -13,6 +13,7 @@ class Triangle : public Object {
 	Vect A, B, C;
 	Vect NormalA, NormalB, NormalC;
 	float refraIdx;
+	bool hasSetNormal;
 public:
 	Triangle();
 	Triangle(Vect, Vect, Vect, Color, float);
@@ -22,6 +23,7 @@ public:
 		NormalA=normal_a;
 		NormalB=normal_b;
 		NormalC=normal_c;
+		hasSetNormal = true;
 	}
 	virtual Vect getTriangleSmoothNormal(Vect position)
 	{
@@ -56,9 +58,10 @@ public:
 	virtual Color getColor(){return color;}
 
 	virtual Vect getNormalAt(Vect point){
-		//normal = getTriangleNormal();
-		normal= getTriangleSmoothNormal(point);
-		return normal;		
+		if(!hasSetNormal)
+			return getTriangleNormal();
+		else
+			return getTriangleSmoothNormal(point);
 	}
 	virtual Vect getTangentAt(Vect point){
 		//Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
@@ -133,8 +136,12 @@ Triangle::Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue, floa
 	A = pointA;
 	B = pointB;
 	C = pointC;
+	NormalA = getTriangleNormal();
+	NormalB = getTriangleNormal();
+	NormalC = getTriangleNormal();
 	color = colorValue;
 	refraIdx = refraIdxValue;
+	hasSetNormal = false;
 }
 
 #endif

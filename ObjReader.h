@@ -56,7 +56,6 @@ public:
 		if(!input)
 			return false;
 
-		int k=0;
 		while(!input.eof())
 		{
 			input>>head;
@@ -87,13 +86,6 @@ public:
 				Triangle* triangle=new Triangle(points.at(value_one),points.at(value_two),points.at(value_three),object_color,refraIdxValue);
 				triangle->setNormals(normals.at(normal_x),normals.at(normal_y),normals.at(normal_z));
 				scence_objects->push_back(triangle);
-
-				k++;
-				if(k==992)
-				{
-					printf("haha");
-				}
-
 			}
 			else if(head=="vn")
 			{
