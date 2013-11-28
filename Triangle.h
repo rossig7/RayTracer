@@ -54,9 +54,7 @@ public:
 	virtual Vect getTriangleNormal() {
 		Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
 		Vect BA (B.getVectX() - A.getVectX(), B.getVectY() - A.getVectY(), B.getVectZ() - A.getVectZ());
-		normal = CA.crossProduct(BA).normalize();
-		//normal = normal.negtive();
-		return normal;
+		return CA.crossProduct(BA).normalize();
 	}
 	virtual double getTriangleDistance() {
 		normal = getTriangleNormal();
