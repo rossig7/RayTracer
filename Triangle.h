@@ -25,8 +25,16 @@ public:
 		NormalC=normal_c;
 		hasSetNormal = true;
 	}
-	virtual Vect getTriangleSmoothNormal(Vect position)
+	virtual Vect getProjectPosition(Vect above_position)
 	{
+		Vect line_ap=above_position.vectAdd(A.negtive());
+		Vect temp_normal=getTriangleNormal();
+		return temp_normal.vectMult(line_ap.dotProduct(temp_normal)).negtive().vectAdd(line_ap).vectAdd(A);
+	}
+
+	virtual Vect getTriangleSmoothNormal(Vect above_position)
+	{
+		Vect position=getProjectPosition(above_position);
 		double AP_x,AP_y,AB_x,AB_y,AC_x,AC_y,c,b;
 		Vect NormalAB,NormalAC;
 		AP_x=position.getVectX()-A.getVectX();
