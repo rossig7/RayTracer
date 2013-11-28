@@ -425,51 +425,52 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 				double pass;
 
-				for (pass = 0; pass < 5; pass++) {
-					vector<Photon *> photon_find = volumeKDTree->findKNN(500, pos);
+				for (pass = 0; pass < 3; pass++) {
+					vector<Photon *> volume_photon_find = volumeKDTree->findKNN(PHOTONUSE, pos);
 					float maxDistSqr = -1;
 					Color currentStep(0,0,0,0);
 
-					//cout << photon_find.size() << endl;
+					//cout << volume_photon_find.size() << endl;
 
-					for(int i = 0; i < photon_find.size(); i++)
+					for(int i = 0; i < volume_photon_find.size(); i++)
 					{
-						float distanceSqr = photon_find[i]->position.sqrDist(intersection_position);
+						float distanceSqr = volume_photon_find[i]->position.sqrDist(pos);
 						if (distanceSqr > maxDistSqr) maxDistSqr = distanceSqr;
 					}
 
-					for(int i = 0; i < photon_find.size(); i++)
+					for(int i = 0; i < volume_photon_find.size(); i++)
 					{
-						float distanceSqr = photon_find[i]->position.sqrDist(intersection_position);
+						float distanceSqr = volume_photon_find[i]->position.sqrDist(pos);
 
 
 						float weight = 0.918 * (1 - (1 - pow(NATUREE, -1.953*(distanceSqr)/(2*maxDistSqr)))/(1 - pow(NATUREE, -1.953)));
 						if (weight < 0) weight = 0;
 
-						Vect light_direction = photon_find[i]->dir.negtive();
+						Vect light_direction = volume_photon_find[i]->dir.negtive();
 
 						float cosine_angle = reflection_direction.dotProduct(light_direction);
 						if (cosine_angle < 0) cosine_angle = 0;
 
 						//currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power));
-						currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle));
+						currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 					}
-					if (photon_find.size() != 0) {
-						currentStep = currentStep.colorScalar(1.0/(PHOTONMUM/128*PI*maxDistSqr*sqrt(maxDistSqr)));
+					if (volume_photon_find.size() != 0) {
+						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/128*PI*maxDistSqr*sqrt(maxDistSqr)));
 					}
 					sssColor = sssColor.colorAdd(currentStep);
-					double d = -log(dis_rand(gen))/8;
+					double d = -log(dis_rand(gen))/200;
 
 					pos = pos.vectAdd(reflection_direction.vectMult(d));
-
+					/*
 					if (pass >= 3) {
 						double stopScatter = dis_rand(gen);
 						if (stopScatter > (1 - (pass/5)))
 							break;
 					}
+					*/
 
 				}
-				sssColor = sssColor.colorScalar(1.0/pass); 
+				//sssColor = sssColor.colorScalar(1.0/pass); 
 			}
 		}
 		final_color = final_color.colorAdd(sssColor);
@@ -648,18 +649,20 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 			if (colorSpecial < 0) { //sss
 				// calc spherical coord
-				double d = 0.02;
-				Vect pos = intersection_position.vectAdd(intersecting_ray_direction.vectMult(0.005));
+				double d = 0.05;
+				Vect pos = intersection_position.vectAdd(intersecting_ray_direction.vectMult(d));
 				Vect sssDir = intersecting_ray_direction;
 
-				for (int s = 0; s < 8; s++) {
-					double theta = acos(sssDir.getVectZ());
-					double phi = atan2(sssDir.getVectY(), sssDir.getVectX());
+				std::uniform_real_distribution<> phi_rand(-PI, PI);
 
-					double g = 0.4;
+				for (int s = 0; s < 4; s++) {
+					double theta = acos(sssDir.getVectZ());
+					//double phi = atan2(sssDir.getVectY(), sssDir.getVectX());
+					double phi = phi_rand(gen);
+					double g = 0.3;
 
 					double newCosTheta = 1/abs(2*g)*(1+g*g-pow(((1-g*g)/(1-g+2*g*dis_rand(gen))),2));
-					double newTheta =/* theta + */acos(newCosTheta);
+					double newTheta = /*theta + */acos(newCosTheta);
 
 					double newX = sin(newTheta) * cos(phi);
 					double newY = sin(newTheta) * sin(phi);
@@ -677,7 +680,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 					int index_of_winning_object_reflection = winningObjectIndex(scatter_intersections);
 					if (index_of_winning_object_reflection != -1) {
-						if (scatter_intersections.at(index_of_winning_object_reflection) < d) {
+						if (scatter_intersections.at(index_of_winning_object_reflection) > d) {
 							pos = pos.vectAdd(sssDir.vectMult(d));
 							storeVolumePhoton(pos, sssDir, lightColor);
 							lightColor = lightColor.colorScalar(0.6);						
@@ -759,12 +762,16 @@ void makeCornellBox(Vect corner1, Vect corner2)
 	//left side
 	scene_objects.push_back(new Triangle(D, A, corner1, green, 20));
 	scene_objects.push_back(new Triangle(corner1, E, D, green, 20));
+	//scene_objects.push_back(new Triangle(D, A, corner1, white, 20));
+	//scene_objects.push_back(new Triangle(corner1, E, D, white, 20));
 	//far side
 	scene_objects.push_back(new Triangle(corner2, B, A, white, 20));
 	scene_objects.push_back(new Triangle(A, D, corner2, white, 20));
 	//right side
 	scene_objects.push_back(new Triangle(F, C, B, red, 20));
 	scene_objects.push_back(new Triangle(B, corner2, F, red, 20));
+	//scene_objects.push_back(new Triangle(F, C, B, white, 20));
+	//scene_objects.push_back(new Triangle(B, corner2, F, white, 20));
 	//front side
 	//scene_objects.push_back(new Triangle(E, corner1, C, white, 20));
 	//scene_objects.push_back(new Triangle(C, F, E, white, 20));
@@ -832,13 +839,13 @@ int main(int argc, char *argv[])
 	Color orange(0.94, 0.75, 0.31, 0);
 	Color sssWhite(1.0, 1.0, 1.0, -0.9);
 
-	Vect light_position(0.1, 0.2, 0);
-	//Vect light_position(-0.5, -0.7, -0.4);
+	//Vect light_position(0.1, 0.2, 0);
+	Vect light_position(-0.9, -0.7, -0.4);
 	Light scene_light (light_position, white_light);
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 #ifdef LOADOBJ
-	ObjReader* objReader = new ObjReader("teapot_normal.obj", reflectWhite, 220, 0.1, -0.7, 0.0);
+	ObjReader* objReader = new ObjReader("teapot_normal.obj", sssWhite, 220, 0.1, -0.7, 0.0);
 	objReader->ReadContent(&scene_objects);
 #endif
 	//Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
@@ -894,7 +901,7 @@ for(int i = 0; i < num_threads; i++)
 	kdtree = new KDTree(photons);
 
 	if (volumePhotons.size() > 3) {
-		//volumeKDTree = new KDTree(volumePhotons);
+		volumeKDTree = new KDTree(volumePhotons);
 	}
 
 	tPhoton = clock();
