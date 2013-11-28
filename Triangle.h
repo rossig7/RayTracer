@@ -11,11 +11,36 @@ class Triangle : public Object {
 	double distance;
 	Color color;
 	Vect A, B, C;
+	Vect NormalA, NormalB, NormalC;
 	float refraIdx;
 public:
 	Triangle();
 	Triangle(Vect, Vect, Vect, Color, float);
 
+	virtual void setNormals(Vect normal_a,Vect normal_c,Vect normal_b)
+	{
+		NormalA=normal_a;
+		NormalB=normal_b;
+		NormalC=normal_c;
+	}
+	virtual Vect getTriangleSmoothNormal(Vect position)
+	{
+		double AP_x,AP_y,AB_x,AB_y,AC_x,AC_y,c,b;
+		Vect NormalAB,NormalAC;
+		AP_x=position.getVectX()-A.getVectX();
+		AP_y=position.getVectY()-A.getVectY();
+		AB_x=B.getVectX()-A.getVectX();
+		AB_y=B.getVectY()-A.getVectY();
+		AC_x=C.getVectX()-A.getVectX();
+		AC_y=C.getVectY()-A.getVectY();
+		NormalAB=NormalB.vectAdd(NormalA.negtive());
+		NormalAC=NormalC.vectAdd(NormalA.negtive());
+
+		c=(AP_y-(AB_y/AB_x)*AP_x)/(AC_y-(AB_y/AB_x)*AC_x);
+		b=(AP_x-c*AC_x)/AB_x;
+
+		return NormalA.vectAdd(NormalAB.vectMult(b).vectAdd(NormalAC.vectMult(c))).normalize();
+	}
 	virtual Vect getTriangleNormal() {
 		Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
 		Vect BA (B.getVectX() - A.getVectX(), B.getVectY() - A.getVectY(), B.getVectZ() - A.getVectZ());
@@ -31,12 +56,19 @@ public:
 	virtual Color getColor(){return color;}
 
 	virtual Vect getNormalAt(Vect point){
-		normal = getTriangleNormal();
+		//normal = getTriangleNormal();
+		normal= getTriangleSmoothNormal(point);
 		return normal;		
 	}
 	virtual Vect getTangentAt(Vect point){
-		Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
-		return CA.normalize();
+		//Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
+		Vect Normal=getTriangleSmoothNormal(point);
+		if(Normal.getVectY()==0&&Normal.getVectZ()==0)
+			return Vect(0,1,0);
+		else
+		{
+			return Normal.crossProduct(Vect(1,0,0)).normalize();
+		}
 	}
 
 	virtual float getRefraIdx() {return refraIdx;};

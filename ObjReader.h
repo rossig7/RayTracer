@@ -6,6 +6,7 @@
 #include "Object.h"
 #include <fstream>
 #include <iostream>
+
 using namespace std;
 class ObjReader
 {
@@ -14,6 +15,7 @@ class ObjReader
 	float refraIdxValue;
 	float x_offset,y_offset,z_offset;
 	vector <Vect> points;
+	vector <Vect> normals;
 public:
 	ObjReader(string file_name,Color color, float refraIdxValue,float x_offset,float y_offset,float z_offset)
 	{
@@ -27,7 +29,7 @@ public:
 
 	ObjReader()
 	{
-		
+
 	}
 
 	void SetPara(string file_name,Color color, float refraIdxValue,float x_offset,float y_offset,float z_offset)
@@ -45,13 +47,20 @@ public:
 		fstream input(file_name,ios::in);
 		string head;
 		float value_one,value_two,value_three;
-		string string_one,string_two,string_three;
+		char* string_one;
+		char* string_two;
+		char* string_three;
+		string_one=new char[20];
+		string_two=new char[20];
+		string_three=new char[20];
 		if(!input)
 			return false;
 
+		int k=0;
 		while(!input.eof())
 		{
 			input>>head;
+
 			if(head=="v")
 			{
 				input>>value_one>>value_two>>value_three;
@@ -61,11 +70,36 @@ public:
 			else if(head=="f")
 			{
 				input>>string_one>>string_two>>string_three;
-				string_one=string_one.substr(0,string_one.find("/"));
-				string_two=string_two.substr(0,string_two.find("/"));
-				string_three=string_three.substr(0,string_three.find("/"));
+				int normal_x,normal_y,normal_z;
 
-				scence_objects->push_back(new Triangle(points.at(atoi(string_one.c_str())-1),points.at(atoi(string_two.c_str())-1),points.at(atoi(string_three.c_str())-1),object_color,refraIdxValue));
+				value_one=atoi(strtok(string_one,"/"))-1;
+				strtok(NULL,"/");
+				normal_x=atoi(strtok(NULL,"/"))-1;
+
+				value_two=atoi(strtok(string_two,"/"))-1;
+				strtok(NULL,"/");
+				normal_y=atoi(strtok(NULL,"/"))-1;
+
+				value_three=atoi(strtok(string_three,"/"))-1;
+				strtok(NULL,"/");
+				normal_z=atoi(strtok(NULL,"/"))-1;
+
+				Triangle* triangle=new Triangle(points.at(value_one),points.at(value_two),points.at(value_three),object_color,refraIdxValue);
+				triangle->setNormals(normals.at(normal_x),normals.at(normal_y),normals.at(normal_z));
+				scence_objects->push_back(triangle);
+
+				k++;
+				if(k==992)
+				{
+					printf("haha");
+				}
+
+			}
+			else if(head=="vn")
+			{
+				input>>value_one>>value_two>>value_three;
+				Vect normal(value_one,value_two,value_three);
+				normals.push_back(normal);
 			}
 		}
 		input.close();
