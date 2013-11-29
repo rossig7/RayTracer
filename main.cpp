@@ -404,7 +404,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 #endif
 		}
 
-		if (colorSpecial < 0) {
+		if (colorSpecial < 0) {   //sss
 			double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
 			double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 
@@ -417,6 +417,36 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 			double nNL = n1n2 * dot1;  //n*NL
 			double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
 
+			vector<Photon *> volume_photon_find = volumeKDTree->findKNN(PHOTONUSE, intersection_position);
+			float maxDistSqr = -1;
+			Color firstStep(0,0,0,0);
+
+			//cout << volume_photon_find.size() << endl;
+
+			for(int i = 0; i < volume_photon_find.size(); i++)
+			{
+				float distanceSqr = volume_photon_find[i]->position.sqrDist(intersection_position);
+				if (distanceSqr > maxDistSqr) maxDistSqr = distanceSqr;
+			}
+
+			for(int i = 0; i < volume_photon_find.size(); i++)
+			{
+				float distanceSqr = volume_photon_find[i]->position.sqrDist(intersection_position);
+
+				float weight = 0.918 * (1 - (1 - pow(NATUREE, -1.953*(distanceSqr)/(2*maxDistSqr)))/(1 - pow(NATUREE, -1.953)));
+				if (weight < 0) weight = 0;
+
+				Vect light_direction = volume_photon_find[i]->dir.negtive();
+
+				//currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power));
+				firstStep = firstStep.colorAdd(winning_object_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
+			}
+			if (volume_photon_find.size() != 0) {
+				firstStep = firstStep.colorScalar(1.0/(pow(NATUREE, 0)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
+			}
+			sssColor = sssColor.colorAdd(firstStep);
+
+
 			if (underSQRT > 0) {
 				double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
 				Vect reflection_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
@@ -425,7 +455,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 				double pass;
 
-				for (pass = 0; pass < 3; pass++) {
+				for (pass = 1; pass < 3; pass++) {
 					vector<Photon *> volume_photon_find = volumeKDTree->findKNN(PHOTONUSE, pos);
 					float maxDistSqr = -1;
 					Color currentStep(0,0,0,0);
@@ -455,7 +485,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 						currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 					}
 					if (volume_photon_find.size() != 0) {
-						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/128*PI*maxDistSqr*sqrt(maxDistSqr)));
+						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
 					}
 					sssColor = sssColor.colorAdd(currentStep);
 					double d = -log(dis_rand(gen))/200;
@@ -840,12 +870,12 @@ int main(int argc, char *argv[])
 	Color sssWhite(1.0, 1.0, 1.0, -0.9);
 
 	//Vect light_position(0.1, 0.2, 0);
-	Vect light_position(-0.9, -0.7, -0.4);
+	Vect light_position(-0.8, 0.2, -0.4);
 	Light scene_light (light_position, white_light);
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 #ifdef LOADOBJ
-	ObjReader* objReader = new ObjReader("teapot_normal.obj", sssWhite, 220, 0.1, -0.7, 0.0);
+	ObjReader* objReader = new ObjReader("bunny_normal.obj", sssWhite, 1.6, 0.2, -1.0, 0.0);
 	objReader->ReadContent(&scene_objects);
 #endif
 	//Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
