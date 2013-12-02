@@ -23,10 +23,10 @@ struct KDNode {
 
 class KDTree{
 private:
-	class distanceComparsion {
+	class distanceComparison {
 		Vect center;
 	public:
-		distanceComparsion(Vect center_)
+		distanceComparison(Vect center_)
 		{
 			center = center_;
 		}
@@ -43,7 +43,7 @@ private:
 	void destroyKD_(KDNode *parent);
 	void createKD_(vector<Photon *> &photons, KDNode *parent);
 	void findKNN_(int k, Vect center, KDNode *root,
-            priority_queue<Photon *, vector<Photon *>, distanceComparsion>& KNN_queue );
+            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue );
 	KDTree()
 	{
 		perf_count = 0;

@@ -1,21 +1,6 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <string>
-#include <cmath>
-#include <limits>
-#include <queue>
-#include <mutex>
+#include "System.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <assert.h>
-#include <thread>
-
-#include <random>
-
+#include "IO.h"
 #include "Vect.h"
 #include "Ray.h"
 #include "Camera.h"
@@ -28,7 +13,7 @@
 #include "Triangle.h"
 #include "Photon.h"
 #include "Kdtree.h"
-#include "ObjReader.h"
+#include "BVH.h"
 
 std::mutex photon_mtx;
 
@@ -53,8 +38,7 @@ std::mutex photon_mtx;
 
 #define LOADOBJ
 
-using namespace std;
-
+BVH* bvh;
 KDTree* kdtree;
 KDTree* volumeKDTree;
 vector<Photon *> photons;
@@ -66,77 +50,7 @@ std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis_rand(0, 1);
 std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
-struct RGBType {
-	double r;
-	double g;
-	double b;
-};
-
-void saveBmp(const char *filename, int w, int h, int dpi, RGBType *data)
-{
-	FILE *f;
-	int k = w * h;
-	int s = 4 * k;
-	int filesize = 54 + s;
-
-	double factor = 39.375;
-	int m = static_cast<int>(factor);
-
-	int ppm = dpi * m;
-
-	unsigned char bmpFileHeader[14] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0};
-	unsigned char bmpInfoHeader[40] = {40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 24, 0};
-
-	bmpFileHeader[2] = (unsigned char) (filesize);
-	bmpFileHeader[3] = (unsigned char) (filesize >> 8);
-	bmpFileHeader[4] = (unsigned char) (filesize >> 16);
-	bmpFileHeader[5] = (unsigned char) (filesize >> 24);
-
-	bmpInfoHeader[4] = (unsigned char) (w);
-	bmpInfoHeader[5] = (unsigned char) (w >> 8);
-	bmpInfoHeader[6] = (unsigned char) (w >> 16);
-	bmpInfoHeader[7] = (unsigned char) (w >> 24);
-
-	bmpInfoHeader[8] = (unsigned char) (h);
-	bmpInfoHeader[9] = (unsigned char) (h >> 8);
-	bmpInfoHeader[10] = (unsigned char) (h >> 16);
-	bmpInfoHeader[11] = (unsigned char) (h >> 24);
-
-	bmpInfoHeader[21] = (unsigned char) (s);
-	bmpInfoHeader[22] = (unsigned char) (s >> 8);
-	bmpInfoHeader[23] = (unsigned char) (s >> 16);
-	bmpInfoHeader[24] = (unsigned char) (s >> 24);
-
-	bmpInfoHeader[25] = (unsigned char) (ppm);
-	bmpInfoHeader[26] = (unsigned char) (ppm >> 8);
-	bmpInfoHeader[27] = (unsigned char) (ppm >> 16);
-	bmpInfoHeader[28] = (unsigned char) (ppm >> 24);
-
-	bmpInfoHeader[29] = (unsigned char) (ppm);
-	bmpInfoHeader[30] = (unsigned char) (ppm >> 8);
-	bmpInfoHeader[31] = (unsigned char) (ppm >> 16);
-	bmpInfoHeader[32] = (unsigned char) (ppm >> 24);
-
-	f = fopen(filename, "wb");
-
-	fwrite(bmpFileHeader, 1, 14, f);
-	fwrite(bmpInfoHeader, 1, 40, f);
-
-	for (int i = 0; i < k; i++) {
-		RGBType rgb = data[i];
-
-		double red = data[i].r * 255;
-		double green = data[i].g * 255;
-		double blue = data[i].b * 255;
-
-		unsigned char color[3] = {(unsigned char) floor(blue), (unsigned char) floor(green), (unsigned char) floor(red)};
-
-		fwrite(color, 1, 3, f);
-	}
-
-	fclose(f);
-}
-
+// Only used for testing
 int winningObjectIndex(vector<double> object_intersections)
 {
 	//return the index of winning intersection
@@ -175,11 +89,11 @@ int winningObjectIndex(vector<double> object_intersections)
 	}
 }
 
-Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, Color lightColor, int bounce)
+Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, Color lightColor, int bounce)
 {
-	Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
+	Color winning_object_color = intersect_obj->getColor();
 
-	Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+	Vect winning_object_normal = intersect_obj->getNormalAt(intersection_position);
 
 	//Color final_color = winning_object_color/*.colorScalar(ambientLight)*/;
 
@@ -217,18 +131,33 @@ void storeVolumePhoton(Vect pos, Vect dir, Color lightColor)
 	}
 }
 
-Vect computeReflectionDir(Vect winning_object_normal, Vect intersecting_ray_direction) {
-	double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-	if (dot1 <= 0.02) {
-		return intersecting_ray_direction;
-	}
-	Vect scalar1 = winning_object_normal.vectMult(dot1);
-	Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
-	Vect scalar2 = add1.vectMult(2);
-	Vect add2 = intersecting_ray_direction.negtive().vectAdd(scalar2);
+double FresnelEquation(float cosThetaI, float n1, float n2, int type){
+    // type: 0:reflectance, 1:refractance
+    float sin2ThetaT = (n1/n2)*(n1/n2)*(1-cosThetaI*cosThetaI);
+    float cosThetaT = sqrt(1-sin2ThetaT);
 
-	return add2.normalize();
+    float Rspolarize = (n1*cosThetaI - n2*cosThetaT) / (n1*cosThetaI + n2*cosThetaT);
+    float Rppolarize = (n2*cosThetaI - n1*cosThetaT) / (n2*cosThetaI + n1*cosThetaT);
+
+    if (type == 0)
+        return (Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
+    else
+        return 1-(Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
 }
+
+Vect computeReflectionDir(Vect normal, Vect ray_in) {
+    double dot1 = normal.dotProduct(ray_in.negtive());
+    if (dot1 <= 0.02) {
+        return ray_in;
+    }
+    Vect scalar1 = normal.vectMult(dot1);
+    Vect add1 = scalar1.vectAdd(ray_in);
+    Vect scalar2 = add1.vectMult(2);
+    Vect add2 = ray_in.negtive().vectAdd(scalar2);
+
+    return add2.normalize();
+}
+
 
 Vect computeGlossyRay(Vect reflection_direction, Vect winning_object_normal, double glossiness) {
 	double a = dis_rand(gen);
@@ -239,34 +168,34 @@ Vect computeGlossyRay(Vect reflection_direction, Vect winning_object_normal, dou
 
 	double x = sin(theta) * cos(phi);
 	double z = sin(theta) * sin(phi);
-	//double z = cos(theta);		
+	//double z = cos(theta);
 
 	Vect u = reflection_direction.crossProduct(winning_object_normal);
 	Vect v = reflection_direction.crossProduct(u);
 
 	Vect world_ref_ray_dir = u.vectMult(x).vectAdd(v.vectMult(z).vectAdd(reflection_direction));
-	
+
 	return world_ref_ray_dir.normalize();
 }
 
-Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, vector<Object *> scene_objects, int index_of_winning_object, double accuracy, double ambientLight, int depth)
+Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, int depth)
 {
 	Color final_color(0,0,0,0);
 	if (depth > TRACING_DEPTH) return final_color.clip();
 	intersection_position = intersection_position.vectAdd(intersecting_ray_direction.vectMult(accuracy));
 
-	Color winning_object_color = scene_objects.at(index_of_winning_object)->getColor();
-	Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+	Color intersect_color = intersect_obj->getColor();
+	Vect intersect_normal = intersect_obj->getNormalAt(intersection_position);
 
-	double colorSpecial = winning_object_color.getColorSpecial();
+	double colorSpecial = intersect_color.getColorSpecial();
 
 	if (colorSpecial > 0) {  // have reflection
-		Vect reflection_direction = computeReflectionDir(winning_object_normal, intersecting_ray_direction);
+		Vect reflection_direction = computeReflectionDir(intersect_normal, intersecting_ray_direction);
 
 		double sample;
 		double sampledGlossyReflectColor = 0;
 		Color sampleGlossyReflectColor(0,0,0,0);
-		double colorSpecial = winning_object_color.getColorSpecial();
+		double colorSpecial = intersect_color.getColorSpecial();
 
 		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001 && colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7653 > 0) 
 			sample = GLOSSY_SAMPLE;
@@ -275,32 +204,27 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		for (int i = 0; i < sample; i ++) {
 			Vect world_ref_ray_dir;
 			if (sample != 1)
-				world_ref_ray_dir = computeGlossyRay(reflection_direction, winning_object_normal, 0.2);
+				world_ref_ray_dir = computeGlossyRay(reflection_direction, intersect_normal, 0.2);
 			else
 				world_ref_ray_dir = reflection_direction;
 
 			Ray reflection_ray(intersection_position, world_ref_ray_dir);
-			vector<double> reflection_intersections;
 
-			for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-				reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
-			}
+            double intersect_distance = 1e9;
+            Object * intersect_obj = bvh->Shot(reflection_ray, intersect_distance);
 
-			int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
-			if (index_of_winning_object_reflection != -1) {
+			if (intersect_obj != nullptr && intersect_distance > accuracy) {
 				//no miss
-				if (reflection_intersections.at(index_of_winning_object_reflection) > accuracy) {
-					Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(reflection_intersections.at(index_of_winning_object_reflection)));
+					Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(intersect_distance));
 					Vect reflection_intersection_direction = reflection_direction;
 
-					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
+					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, intersect_obj, accuracy, ambientLight, depth+1);
 
 					if (colorSpecial > 1) 
-						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - winning_object_color.getColorSpecial()));
+						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - intersect_color.getColorSpecial()));
 					else
 						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color);
 					sampledGlossyReflectColor++;
-				}
 			}
 		}
 		sampleGlossyReflectColor = sampleGlossyReflectColor.colorScalar(1.0/sample);
@@ -313,14 +237,14 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 			for (int i = 0; i < sample; i ++) {
 				Vect world_ref_ray_dir;
 
-				double refractance = winning_object_color.getColorSpecial() - 1;
+				double refractance = intersect_color.getColorSpecial() - 1;
 
-				double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
-				double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+				double n1n2 = 1.0 / intersect_obj->getRefraIdx();
+				double dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 
 				if (dot1 < 0) {
-					winning_object_normal = winning_object_normal.negtive();
-					dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+					intersect_normal = intersect_normal.negtive();
+					dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());
 					n1n2 = 1.0 / n1n2;
 				}
 
@@ -329,33 +253,26 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 				if (underSQRT > 0) {
 					double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-					Vect reflection_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+					Vect reflection_direction = intersect_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
 
 					if (sample != 1)
-						world_ref_ray_dir = computeGlossyRay(reflection_direction, winning_object_normal, 0.2);
+						world_ref_ray_dir = computeGlossyRay(reflection_direction, intersect_normal, 0.2);
 					else
 						world_ref_ray_dir = reflection_direction;
 
 					Ray reflection_ray(intersection_position, world_ref_ray_dir);
 
-					vector<double> reflection_intersections;
-					for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-						reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
-					}
-					int index_of_winning_object_reflection = winningObjectIndex(reflection_intersections);
+                    double intersect_distance = 1e9;
+                    Object * intersect_obj = bvh->Shot(reflection_ray, intersect_distance);
 
-					if (index_of_winning_object_reflection != -1) {
-						//no miss
-						double intersect = reflection_intersections.at(index_of_winning_object_reflection);
-						if (intersect > accuracy) {
-							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(accuracy + reflection_intersections.at(index_of_winning_object_reflection)));
+                    if (intersect_obj != nullptr && intersect_distance > accuracy) {
+							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(accuracy + intersect_distance));
 							Vect reflection_intersection_direction = reflection_direction;
 
-							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, scene_objects, index_of_winning_object_reflection, accuracy, ambientLight, depth+1);
+							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, intersect_obj, accuracy, ambientLight, depth+1);
 
 							sampleGlossyRefractColor = sampleGlossyRefractColor.colorAdd(reflection_intersection_color.colorScalar(refractance));
 							sampledGlossyRefractColor++;
-						}
 					}
 				}
 				sampleGlossyRefractColor = sampleGlossyRefractColor.colorScalar(1.0/sample);
@@ -366,7 +283,6 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 	else if (colorSpecial <= 0) {
 		vector<Photon *> photon_find = kdtree->findKNN(PHOTONUSE, intersection_position);
 		float maxDistSqr = -1;
-		int k = 1.5;
 
 		Color sssColor(0,0,0,0);
 
@@ -390,10 +306,10 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 #endif
 			Vect light_direction = photon_find[i]->dir.negtive();
 
-			float cosine_angle = winning_object_normal.dotProduct(light_direction);
+			float cosine_angle = intersect_normal.dotProduct(light_direction);
 			if (cosine_angle < 0) cosine_angle = 0;
 
-			final_color = final_color.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle * weight));
+			final_color = final_color.colorAdd(intersect_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle * weight));
 		}
 		if (photon_find.size() != 0) {
 			//final_color = final_color.colorScalar(1.0 / (photon_find.size()));
@@ -405,12 +321,12 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 		}
 
 		if (colorSpecial < 0) {   //sss
-			double n1n2 = 1.0 / scene_objects.at(index_of_winning_object)->getRefraIdx();
-			double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+			double n1n2 = 1.0 / intersect_obj->getRefraIdx();
+			double dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 
 			if (dot1 < 0) {
-				winning_object_normal = winning_object_normal.negtive();
-				dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
+				intersect_normal = intersect_normal.negtive();
+				dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());
 				n1n2 = 1.0 / n1n2;
 			}
 
@@ -438,8 +354,8 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 				Vect light_direction = volume_photon_find[i]->dir.negtive();
 
-				//currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power));
-				firstStep = firstStep.colorAdd(winning_object_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
+				//currentStep = currentStep.colorAdd(intersect_color.colorMultiply(photon_find[i]->power));
+				firstStep = firstStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 			}
 			if (volume_photon_find.size() != 0) {
 				firstStep = firstStep.colorScalar(1.0/(pow(NATUREE, 0)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
@@ -449,7 +365,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 
 			if (underSQRT > 0) {
 				double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-				Vect reflection_direction = winning_object_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+				Vect reflection_direction = intersect_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
 
 				Vect pos = intersection_position.vectAdd(reflection_direction.vectMult(0.02));
 
@@ -481,8 +397,8 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 						float cosine_angle = reflection_direction.dotProduct(light_direction);
 						if (cosine_angle < 0) cosine_angle = 0;
 
-						//currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(photon_find[i]->power));
-						currentStep = currentStep.colorAdd(winning_object_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
+						//currentStep = currentStep.colorAdd(intersect_color.colorMultiply(photon_find[i]->power));
+						currentStep = currentStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 					}
 					if (volume_photon_find.size() != 0) {
 						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
@@ -508,51 +424,32 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, ve
 	return final_color.clip();
 }
 
-double FresnelEquation(float cosThetaI, float n1, float n2, int type){
-	// type: 0:reflectance, 1:refractance
-	float sin2ThetaT = (n1/n2)*(n1/n2)*(1-cosThetaI*cosThetaI);
-	float cosThetaT = sqrt(1-sin2ThetaT);
 
-	float Rspolarize = (n1*cosThetaI - n2*cosThetaT) / (n1*cosThetaI + n2*cosThetaT);
-	float Rppolarize = (n2*cosThetaI - n1*cosThetaT) / (n2*cosThetaI + n1*cosThetaT);
-
-	if (type == 0)
-		return (Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
-	else
-		return 1-(Rspolarize*Rspolarize + Rppolarize*Rppolarize) / 2;
-}
 
 void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> scene_objects, double accuracy, double ambientLight, Color lightColor, int bounce) {
 	//cout << bounce << endl;
 	if (bounce> BOUNCE)
 		return;
-	
-	vector<double> intersections;
 
-	for (int index = 0; index < scene_objects.size(); index++) {
-		intersections.push_back(scene_objects.at(index)->findIntersection(photon_ray));
-	}
+    double intersect_dist = 1e9;
+    Object * intersect_obj = bvh->Shot(photon_ray, intersect_dist);
 
-	int index_of_winning_object = winningObjectIndex(intersections);
+    if (intersect_obj == nullptr)
+        return;
 
-	if (index_of_winning_object == -1) {
-		//if (bounce == 0) pn--;
-		return;
-	}
-
-	if (intersections.at(index_of_winning_object) > accuracy) {
-		Vect intersection_position = photon_ray.getRayOrigin().vectAdd(photon_ray_direction.vectMult(accuracy + intersections.at(index_of_winning_object)));
+	if (intersect_dist > accuracy) {
+		Vect intersection_position = photon_ray.getRayOrigin().vectAdd(photon_ray_direction.vectMult(accuracy + intersect_dist));
 		Vect intersecting_ray_direction = photon_ray_direction;
-		Vect winning_object_normal = scene_objects.at(index_of_winning_object)->getNormalAt(intersection_position);
+		Vect winning_object_normal = intersect_obj->getNormalAt(intersection_position);
 
 		float reflectance = 1;
 		int refractMask[3] = {1,1,1};
 		bool canTransmit = true;
 
-		double colorSpecial = scene_objects.at(index_of_winning_object)->getColor().getColorSpecial();
+		double colorSpecial = intersect_obj->getColor().getColorSpecial();
 
 		if (colorSpecial <= 0) {
-			lightColor = storePhoton(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, lightColor, bounce);
+			lightColor = storePhoton(intersection_position, intersecting_ray_direction, intersect_obj, accuracy, ambientLight, lightColor, bounce);
 			lightColor = lightColor.colorScalar(0.8);
 
 			// not use Russian Roulette for lambert model 
@@ -570,7 +467,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		}
 		else if (colorSpecial < 1 && colorSpecial > 0) {
 			float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-			float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx();
+			float n2 = intersect_obj->getRefraIdx();
 
 			reflectance = FresnelEquation(cosTheta, 1, n2, 0);
 			int roll = rand() % 100;
@@ -581,7 +478,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		else if (colorSpecial < 2 && colorSpecial > 0) {
 			for (int i = 0; i < 3; i++) {
 				float cosTheta = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());
-				float n2 = scene_objects.at(index_of_winning_object)->getRefraIdx()-0.01 + i/100.0;
+				float n2 = intersect_obj->getRefraIdx()-0.01 + i/100.0;
 
 				if (cosTheta > 0) 
 					reflectance = FresnelEquation(cosTheta, 1, n2, 1);
@@ -597,7 +494,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		}
 
 		if (canTransmit) {
-			if (scene_objects.at(index_of_winning_object)->getColor().getColorSpecial() == 0) {  // Lambert model
+			if (intersect_obj->getColor().getColorSpecial() == 0) {  // Lambert model
 				double Zeta1 = dis_rand(gen);
 				double Zeta2 = dis_rand(gen);
 				
@@ -608,7 +505,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 				double z = sin(theta) * sin(phi);
 				double y = cos(theta);		
 
-				Vect u = scene_objects.at(index_of_winning_object)->getTangentAt(intersection_position);
+				Vect u = intersect_obj->getTangentAt(intersection_position);
 				Vect v = winning_object_normal.crossProduct(u);
 
 				Vect world_ref_ray_dir = u.vectMult(x).vectAdd(v.vectMult(z).vectAdd(winning_object_normal).vectMult(y));
@@ -633,7 +530,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 			else if (colorSpecial < 2 && colorSpecial > 0) {
 				for (int i = 0; i < 3; i++) {
 					if (refractMask == 0) continue;
-					double n1n2 = 1.0 / (scene_objects.at(index_of_winning_object)->getRefraIdx()-0.01 + i/100.0);
+					double n1n2 = 1.0 / (intersect_obj->getRefraIdx()-0.01 + i/100.0);
 					double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 	
 					if (dot1 < 0) {
@@ -702,15 +599,11 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 					Ray scatterRay(pos, sssDir);
 
-					vector<double> scatter_intersections;
+                    double intersect_distance = 1e9;
+                    Object * intersect_obj = bvh->Shot(scatterRay, intersect_distance);
 
-					for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-						scatter_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(scatterRay));
-					}
-
-					int index_of_winning_object_reflection = winningObjectIndex(scatter_intersections);
-					if (index_of_winning_object_reflection != -1) {
-						if (scatter_intersections.at(index_of_winning_object_reflection) > d) {
+                    if (intersect_obj != nullptr) {
+						if (intersect_distance > d) {
 							pos = pos.vectAdd(sssDir.vectMult(d));
 							storeVolumePhoton(pos, sssDir, lightColor);
 							lightColor = lightColor.colorScalar(0.6);						
@@ -724,93 +617,6 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 			}
 		}		
 	}
-}
-
-
-void makeCube(Vect corner1, Vect corner2, Color color)
-{
-	double c1x = corner1.getVectX();
-	double c1y = corner1.getVectY();
-	double c1z = corner1.getVectZ();
-
-	double c2x = corner2.getVectX();
-	double c2y = corner2.getVectY();
-	double c2z = corner2.getVectZ();
-
-	Vect A (c2x, c1y, c1z);
-	Vect B (c2x, c1y, c2z);
-	Vect C (c1x, c1y, c2z);
-
-	Vect D (c2x, c2y, c1z);
-	Vect E (c1x, c2y, c1z);
-	Vect F (c1x, c2y, c2z);
-
-	//left side
-	scene_objects.push_back(new Triangle(D, A, corner1, color, 2));
-	scene_objects.push_back(new Triangle(corner1, E, D, color, 2));
-	//far side
-	scene_objects.push_back(new Triangle(corner2, B, A, color, 2));
-	scene_objects.push_back(new Triangle(A, D, corner2, color, 2));
-	//right side
-	scene_objects.push_back(new Triangle(F, C, B, color, 2));
-	scene_objects.push_back(new Triangle(B, corner2, F, color, 2));
-	//front side
-	scene_objects.push_back(new Triangle(E, corner1, C, color, 2));
-	scene_objects.push_back(new Triangle(C, F, E, color, 2));
-	//top
-	scene_objects.push_back(new Triangle(D, E, F, color, 2));
-	scene_objects.push_back(new Triangle(F, corner2, D, color, 2));
-	//bottom
-	scene_objects.push_back(new Triangle(corner1, A, B, color, 2));
-	scene_objects.push_back(new Triangle(B, C, corner1, color, 2));
-}
-
-void makeCornellBox(Vect corner1, Vect corner2)
-{
-	double c1x = corner1.getVectX();
-	double c1y = corner1.getVectY();
-	double c1z = corner1.getVectZ();
-
-	double c2x = corner2.getVectX();
-	double c2y = corner2.getVectY();
-	double c2z = corner2.getVectZ();
-
-	Vect A (c2x, c1y, c1z);
-	Vect B (c2x, c1y, c2z);
-	Vect C (c1x, c1y, c2z);
-
-	Vect D (c2x, c2y, c1z);
-	Vect E (c1x, c2y, c1z);
-	Vect F (c1x, c2y, c2z);
-
-
-	Color red(1, 0.25, 0.25, 0);
-	Color green(0.25, 1, 0.25, 0);
-	Color white(1.0, 1.0, 1.0, 0);
-
-
-	//left side
-	scene_objects.push_back(new Triangle(D, A, corner1, green, 20));
-	scene_objects.push_back(new Triangle(corner1, E, D, green, 20));
-	//scene_objects.push_back(new Triangle(D, A, corner1, white, 20));
-	//scene_objects.push_back(new Triangle(corner1, E, D, white, 20));
-	//far side
-	scene_objects.push_back(new Triangle(corner2, B, A, white, 20));
-	scene_objects.push_back(new Triangle(A, D, corner2, white, 20));
-	//right side
-	scene_objects.push_back(new Triangle(F, C, B, red, 20));
-	scene_objects.push_back(new Triangle(B, corner2, F, red, 20));
-	//scene_objects.push_back(new Triangle(F, C, B, white, 20));
-	//scene_objects.push_back(new Triangle(B, corner2, F, white, 20));
-	//front side
-	//scene_objects.push_back(new Triangle(E, corner1, C, white, 20));
-	//scene_objects.push_back(new Triangle(C, F, E, white, 20));
-	//top
-	scene_objects.push_back(new Triangle(D, E, F, white, 20));
-	scene_objects.push_back(new Triangle(F, corner2, D, white, 20));
-	//bottom
-	scene_objects.push_back(new Triangle(corner1, A, B, white, 20));
-	scene_objects.push_back(new Triangle(B, C, corner1, white, 20));
 }
 
 
@@ -874,10 +680,12 @@ int main(int argc, char *argv[])
 	Light scene_light (light_position, white_light);
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
+
 #ifdef LOADOBJ
 	ObjReader* objReader = new ObjReader("bunny_normal.obj", sssWhite, 1.6, 0.2, -1.0, 0.0);
 	objReader->ReadContent(&scene_objects);
 #endif
+
 	//Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
 	Sphere scene_sphere (new_sphere_pos, 0.3, sssWhite, 1.5);
 	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite, 1.5);
@@ -886,7 +694,33 @@ int main(int argc, char *argv[])
 	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
 	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
 
-	makeCornellBox(Vect(1, 1, 1), Vect(-1, -1, -1));
+	makeCornellBox(scene_objects, Vect(1, 1, 1), Vect(-1, -1, -1));
+
+    bvh = new BVH(scene_objects);
+
+    // BVH self check
+    for(int i = 0; i < 360; i++)
+    {
+        std::uniform_real_distribution<> rg(-1, 1);
+
+        vector<double> intersections;
+        Ray r(Vect(rg(gen),rg(gen),rg(gen)),Vect(rg(gen),rg(gen),rg(gen)));
+        for (int index = 0; index < scene_objects.size(); index++) {
+            intersections.push_back(scene_objects.at(index)->findIntersection(r));
+        }
+
+        int index_of_winning_object = winningObjectIndex(intersections);
+        Object * ref = NULL;
+        if(index_of_winning_object >= 0)
+           ref = scene_objects.at(index_of_winning_object);
+
+        double intersect_dist = 1e9;
+        Object * intersect_obj = bvh->Shot(r, intersect_dist);
+
+        // cout << i <<endl;
+        assert(intersect_obj == ref);
+    }
+
 
 	tPrep = clock();
 	float diffPrep = ((float) tPrep - (float) t1) / CLOCKS_PER_SEC;
@@ -1002,8 +836,6 @@ for(int i = 0; i < num_threads; i++)
 					Vect camUp = worldUp.vectAdd(cam_ray_direction.vectMult(worldUp.dotProduct(cam_ray_direction)).negtive());
 					Vect camSide = camUp.crossProduct(cam_ray_direction);
 
-					
-
 					double dofColor[3] = {0,0,0};
 
 					for (int d = 0; d < DOF_SAMPLE; d++) {
@@ -1018,31 +850,24 @@ for(int i = 0; i < num_threads; i++)
 
 							cam_ray = Ray(camPosDoF, camDirDoF);
 						}
-	
-						vector<double> intersections;
-	
-						for (int index = 0; index < scene_objects.size(); index++) {
-							intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
-						}
-	
-						int index_of_winning_object = winningObjectIndex(intersections);
-	
-						if (index_of_winning_object == -1) {
+
+                        double intersect_distance = 1e9;
+                        Object * intersect_obj = bvh->Shot(cam_ray, intersect_distance);
+
+						if (intersect_obj == nullptr) {
 							dofColor[0] += 0;
 							dofColor[1] += 0;
 							dofColor[2] += 0;
 						}
-						else {
-							if (intersections.at(index_of_winning_object) > accuracy) {
-								Vect intersection_position = cam_ray.getRayOrigin().vectAdd(cam_ray_direction.vectMult(intersections.at(index_of_winning_object)));
+						else if (intersect_distance > accuracy) {
+								Vect intersection_position = cam_ray.getRayOrigin().vectAdd(cam_ray_direction.vectMult(intersect_distance));
 								Vect intersecting_ray_direction = cam_ray_direction;
 	
-								Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, accuracy, ambientLight, 1);
+								Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, intersect_obj, accuracy, ambientLight, 1);
 	
 								dofColor[0] += intersection_color.getColorRed();
 								dofColor[1] += intersection_color.getColorGreen();
 								dofColor[2] += intersection_color.getColorBlue();
-							}
 						}
 					}
 					tempRed[aa_index] = dofColor[0]/DOF_SAMPLE;

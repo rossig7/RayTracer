@@ -23,6 +23,19 @@ public:
 	double getVectY() const{return y;}
 	double getVectZ() const{return z;}
 
+    double operator[](int idx) const
+    {
+         switch(idx)
+         {
+             case 0: return x;
+             case 1: return y;
+             case 2: return z;
+             default:
+                 assert(0);
+         }
+        return 0;
+    }
+
 	double magnitude(){
 		return sqrt(x*x+y*y+z*z);
 	}

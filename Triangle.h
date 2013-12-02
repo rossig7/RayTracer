@@ -1,7 +1,7 @@
 #ifndef _TRIANGLE_H
 #define _TRIANGLE_H
 
-#include <math.h>
+#include "System.h"
 #include "Object.h"
 #include "Vect.h"
 #include "Color.h"
@@ -15,8 +15,38 @@ class Triangle : public Object {
 	float refraIdx;
 	bool hasSetNormal;
 public:
-	Triangle();
-	Triangle(Vect, Vect, Vect, Color, float);
+    virtual BBox getBBox() const
+    {
+        BBox result;
+        result.data[0][0] = min(A.getVectX(),min(B.getVectX(),C.getVectX()));
+        result.data[0][1] = max(A.getVectX(),max(B.getVectX(),C.getVectX()));
+        result.data[1][0] = min(A.getVectY(),min(B.getVectY(),C.getVectY()));
+        result.data[1][1] = max(A.getVectY(),max(B.getVectY(),C.getVectY()));
+        result.data[2][0] = min(A.getVectZ(),min(B.getVectZ(),C.getVectZ()));
+        result.data[2][1] = max(A.getVectZ(),max(B.getVectZ(),C.getVectZ()));
+        return result;
+    };
+
+    Triangle(){
+        A = Vect (1,0,0);
+        B = Vect (0,1,0);
+        C = Vect (0,0,1);
+        distance = 0;
+        color = Color(0.5,0.5,0.5,0);
+        refraIdx = 1;
+    }
+
+    Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue, float refraIdxValue){
+        A = pointA;
+        B = pointB;
+        C = pointC;
+        NormalA = getTriangleNormal();
+        NormalB = getTriangleNormal();
+        NormalC = getTriangleNormal();
+        color = colorValue;
+        refraIdx = refraIdxValue;
+        hasSetNormal = false;
+    }
 
 	virtual void setNormals(Vect normal_a,Vect normal_c,Vect normal_b)
 	{
@@ -69,6 +99,7 @@ public:
 		else
 			return getTriangleSmoothNormal(point);
 	}
+
 	virtual Vect getTangentAt(Vect point){
 		//Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
 		Vect Normal=getTriangleSmoothNormal(point);
@@ -82,13 +113,13 @@ public:
 
 	virtual float getRefraIdx() {return refraIdx;};
 
-	virtual double findIntersection(Ray ray){
+	virtual double findIntersection(Ray ray)  {
 		Vect ray_direction = ray.getRayDirection();
 		Vect ray_origin = ray.getRayOrigin();
 
+        normal = getTriangleNormal();
+        distance = getTriangleDistance();
 		double a = ray_direction.dotProduct(normal);
-		normal = getTriangleNormal();
-		distance = getTriangleDistance();
 
 		if (a == 0){
 			// ray parallel to plane
@@ -129,25 +160,5 @@ public:
 	}
 };
 
-Triangle::Triangle(){
-	A = Vect (1,0,0);
-	B = Vect (0,1,0);
-	C = Vect (0,0,1);
-	distance = 0;
-	color = Color(0.5,0.5,0.5,0);
-	refraIdx = 1;
-}
-
-Triangle::Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue, float refraIdxValue){
-	A = pointA;
-	B = pointB;
-	C = pointC;
-	NormalA = getTriangleNormal();
-	NormalB = getTriangleNormal();
-	NormalC = getTriangleNormal();
-	color = colorValue;
-	refraIdx = refraIdxValue;
-	hasSetNormal = false;
-}
 
 #endif

@@ -14,7 +14,17 @@ class Sphere : public Object {
 public:
 	Sphere();
 	Sphere(Vect, double, Color, float);
-
+    virtual BBox getBBox() const
+    {
+        BBox result;
+        result.data[0][0] = center.getVectX() - radius;
+        result.data[0][1] = center.getVectX() + radius;
+        result.data[1][0] = center.getVectY() - radius;
+        result.data[1][1] = center.getVectY() + radius;
+        result.data[2][0] = center.getVectZ() - radius;
+        result.data[2][1] = center.getVectZ() + radius;
+        return result;
+    };
 	virtual Vect getSphereCenter(){return center;}
 	virtual double getSphereRadius(){return radius;}
 	virtual Color getColor(){return color;}

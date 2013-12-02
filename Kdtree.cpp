@@ -1,17 +1,4 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <string>
-#include <cmath>
-#include <limits>
-#include <queue>
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <assert.h>
-
+#include "System.h"
 #include "Vect.h"
 #include "Photon.h"
 #include "Kdtree.h"
@@ -21,35 +8,13 @@
 #define PI 3.1415926
 #define BOUNCE 3
 
-using namespace std;
-
-
 void KDTree::createKD_(vector<Photon *> &photons, KDNode *parent)
 {
 	assert(photons.size() > max_elements);
-	switch (parent->axis) {
-		case 0:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectX() < b->position.getVectX();
-							});
-	        break;
-		case 1:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectY() < b->position.getVectY();
-							});
-	        break;
-		case 2:
-			sort(photons.begin(), photons.end(),
-					[](const Photon *a, const Photon *b) -> bool
-							{
-								return a->position.getVectZ() < b->position.getVectZ();
-							});
-	        break;
-	}
+
+	sort(photons.begin(), photons.end(),
+		[&](const Photon *a, const Photon *b) -> bool
+            {return a->position[parent->axis] < b->position[parent->axis];});
 
 	int mid = photons.size() / 2;
 	parent->self = photons[mid];
@@ -100,7 +65,7 @@ void KDTree::destroyKD_(KDNode *parent)
 }
 
 void KDTree::findKNN_(int k, Vect center, KDNode *root,
-        priority_queue<Photon *, vector<Photon *>, distanceComparsion>& KNN_queue)
+        priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue)
 {
 	/*
 	Photon * topPhoton = KNN_queue->top();
@@ -245,8 +210,8 @@ void KDTree::findKNN_(int k, Vect center, KDNode *root,
 
 vector<Photon *> KDTree::findKNN(int k, Vect center)
 {
-    auto KNN_queue = priority_queue<Photon *, vector<Photon *>, distanceComparsion>
-			(distanceComparsion(center));
+    auto KNN_queue = priority_queue<Photon *, vector<Photon *>, distanceComparison>
+			(distanceComparison(center));
 
 	findKNN_(k, center, Root, KNN_queue);
 

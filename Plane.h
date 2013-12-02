@@ -1,10 +1,11 @@
 #ifndef _PLANE_H
 #define _PLANE_H
 
-#include <math.h>
+#include "System.h"
 #include "Object.h"
 #include "Vect.h"
 #include "Color.h"
+
 
 class Plane : public Object {
 	Vect normal;
@@ -49,5 +50,6 @@ Plane::Plane(Vect normalValue, double distanceValue, Color colorValue){
 	distance = distanceValue;
 	color = colorValue;
 }
+
 
 #endif
