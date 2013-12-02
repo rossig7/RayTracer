@@ -45,49 +45,9 @@ vector<Photon *> photons;
 vector<Photon *> volumePhotons;
 vector<Object *> scene_objects;
 
-std::random_device rd;
-std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis_rand(0, 1);
 std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
-// Only used for testing
-int winningObjectIndex(vector<double> object_intersections)
-{
-	//return the index of winning intersection
-	int index_of_minimum_value;
-
-	if (object_intersections.size() == 0) {
-		return -1;
-	}
-	else if (object_intersections.size() == 1) {
-		if (object_intersections.at(0) > 0) {
-			return 0;
-		}
-		else {
-			return -1;
-		}
-	}
-	else {
-		double max = 0;
-		for (int i = 0; i < object_intersections.size(); i++) {
-			if (max < object_intersections.at(i))
-				max = object_intersections.at(i);
-		}
-
-		if (max > 0) {
-			for (int index = 0; index < object_intersections.size(); index++) {
-				if (object_intersections.at(index) > 0 && object_intersections.at(index) <= max) {
-					max = object_intersections.at(index);
-					index_of_minimum_value = index;
-				}
-			}
-			return index_of_minimum_value;
-		}
-		else {
-			return -1;
-		}
-	}
-}
 
 Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, Color lightColor, int bounce)
 {
@@ -698,31 +658,9 @@ int main(int argc, char *argv[])
 
     bvh = new BVH(scene_objects);
 
-    // BVH self check
-    for(int i = 0; i < 360; i++)
-    {
-        std::uniform_real_distribution<> rg(-1, 1);
+    BVHSelfTest(scene_objects, bvh);
 
-        vector<double> intersections;
-        Ray r(Vect(rg(gen),rg(gen),rg(gen)),Vect(rg(gen),rg(gen),rg(gen)));
-        for (int index = 0; index < scene_objects.size(); index++) {
-            intersections.push_back(scene_objects.at(index)->findIntersection(r));
-        }
-
-        int index_of_winning_object = winningObjectIndex(intersections);
-        Object * ref = NULL;
-        if(index_of_winning_object >= 0)
-           ref = scene_objects.at(index_of_winning_object);
-
-        double intersect_dist = 1e9;
-        Object * intersect_obj = bvh->Shoot(r, intersect_dist);
-
-        // cout << i <<endl;
-        assert(intersect_obj == ref);
-    }
-
-
-	tPrep = clock();
+    tPrep = clock();
 	float diffPrep = ((float) tPrep - (float) t1) / CLOCKS_PER_SEC;
 	cout << diffPrep << "seconds" << endl;
 	cout << "start emit photons..." << endl;
@@ -733,7 +671,11 @@ int main(int argc, char *argv[])
 
     std::vector<std::thread> threads;
 
+#if MULTI_THREAD == 1
     unsigned num_threads = 2 * std::thread::hardware_concurrency();
+#else
+    unsigned num_threads = 1;
+#endif
 
     assert( (width % num_threads) == 0);
 

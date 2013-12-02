@@ -57,9 +57,11 @@ struct BVHNode
 class BVH
 {
 private:
+#if BVH_PERF_TEST == 1
     mutable int performance_counter;
     mutable int performance_counter_ch;
     mutable int total_obj;
+#endif
     BVHNode root;
     Object *Shoot(const BVHNode &node, const Ray &ray, double &distance) const;
 
@@ -71,5 +73,6 @@ public:
     Object *Shoot(const Ray &ray, double &distance) const;
 };
 
+void BVHSelfTest(vector<Object *> objects, BVH *bvh);
 
 #endif

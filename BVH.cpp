@@ -97,7 +97,9 @@ void BVHNode::splitNode()
 
 BVH::BVH(vector<Object *> & in_objects)
 {
+#if BVH_PERF_TEST == 1
     total_obj = in_objects.size();
+#endif
     root.objects = in_objects;
     root.calculateBBox();
     root.splitNode();
@@ -105,19 +107,28 @@ BVH::BVH(vector<Object *> & in_objects)
 
 Object * BVH::Shoot(const Ray &ray, double &distance) const
 {
+#ifdef __APPLE__
+    if(isnan(ray.getRayDirection()[0]))
+#else
     if(_isnan(ray.getRayDirection()[0]))
+#endif
         return NULL;
+
+#if BVH_PERF_TEST == 1
     performance_counter = 0;
     performance_counter_ch = 0;
+#endif
     if(root.bbox.Intersect(ray, distance) < 0)
         return nullptr;
     Object * r = Shoot(root, ray, distance);
+#if BVH_PERF_TEST == 1
     if(performance_counter > 10000)
     {
         cout << ray.getRayOrigin()[0] << ","  << ray.getRayOrigin()[1] << ","<< ray.getRayOrigin()[2] << "," <<endl;
         cout << ray.getRayDirection()[0] << ","  << ray.getRayDirection()[1] << ","<< ray.getRayDirection()[2] << "," <<endl;
     }
-    //cout << performance_counter_ch << ":" << performance_counter << ":" << total_obj << endl;
+    // cout << performance_counter_ch << ":" << performance_counter << ":" << total_obj << endl;
+#endif
     return r;
 }
 
@@ -129,10 +140,14 @@ Object * BVH::Shoot(const BVHNode &node, const Ray &ray, double &distance) const
     for(auto object: node.objects)
     {
         double t = object->findIntersection(ray);
+#if BVH_PERF_TEST == 1
         performance_counter++;
+#endif
         if(t >= 0 && t < distance)
         {
+#if BVH_PERF_TEST == 1
             performance_counter_ch++;
+#endif
             result = object;
             distance = min(distance , t);
         }
@@ -166,4 +181,72 @@ Object * BVH::Shoot(const BVHNode &node, const Ray &ray, double &distance) const
     }
 
     return result;
+}
+
+// Only used for testing
+int winningObjectIndex(vector<double> object_intersections)
+{
+    //return the index of winning intersection
+    int index_of_minimum_value;
+
+    if (object_intersections.size() == 0) {
+        return -1;
+    }
+    else if (object_intersections.size() == 1) {
+        if (object_intersections.at(0) > 0) {
+            return 0;
+        }
+        else {
+            return -1;
+        }
+    }
+    else {
+        double max = 0;
+        for (int i = 0; i < object_intersections.size(); i++) {
+            if (max < object_intersections.at(i))
+                max = object_intersections.at(i);
+        }
+
+        if (max > 0) {
+            for (int index = 0; index < object_intersections.size(); index++) {
+                if (object_intersections.at(index) > 0 && object_intersections.at(index) <= max) {
+                    max = object_intersections.at(index);
+                    index_of_minimum_value = index;
+                }
+            }
+            return index_of_minimum_value;
+        }
+        else {
+            return -1;
+        }
+    }
+}
+
+void BVHSelfTest(vector<Object *> objects, BVH *bvh)
+{
+    // BVH self check
+    for(int i = 0; i < BVH_SELF_TEST_TIMES; i++)
+    {
+        std::uniform_real_distribution<> rg(-1, 1);
+
+        vector<double> intersections;
+        Ray r(Vect(rg(gen),rg(gen),rg(gen)),Vect(rg(gen),rg(gen),rg(gen)));
+        for (int index = 0; index < objects.size(); index++) {
+            intersections.push_back(objects.at(index)->findIntersection(r));
+        }
+
+        int index_of_winning_object = winningObjectIndex(intersections);
+        Object * ref = NULL;
+        if(index_of_winning_object >= 0)
+            ref = objects.at(index_of_winning_object);
+
+        double intersect_dist = 1e9;
+        Object * intersect_obj = bvh->Shoot(r, intersect_dist);
+
+        assert(intersect_obj == ref);
+    }
+
+#if BVH_SELF_TEST_TIMES > 0
+    cout << "BVH self test passed \n";
+#endif
 }
