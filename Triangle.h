@@ -101,13 +101,18 @@ public:
 	}
 
 	virtual Vect getTangentAt(Vect point){
-		//Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
-		Vect Normal=getTriangleSmoothNormal(point);
-		if(Normal.getVectY()==0&&Normal.getVectZ()==0)
-			return Vect(0,1,0);
-		else
-		{
-			return Normal.crossProduct(Vect(1,0,0)).normalize();
+		if(!hasSetNormal) {
+			Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
+			return CA.normalize();
+		}
+		else {
+			Vect Normal=getTriangleSmoothNormal(point);
+			if(Normal.getVectY()==0&&Normal.getVectZ()==0)
+				return Vect(0,1,0);
+			else
+			{
+				return Normal.crossProduct(Vect(1,0,0)).normalize();
+			}
 		}
 	}
 

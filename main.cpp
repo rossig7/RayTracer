@@ -358,7 +358,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 				firstStep = firstStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 			}
 			if (volume_photon_find.size() != 0) {
-				firstStep = firstStep.colorScalar(1.0/(pow(NATUREE, 0)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
+				firstStep = firstStep.colorScalar(1.0/(pow(NATUREE, 0)*PHOTONMUM/8*PI*maxDistSqr*sqrt(maxDistSqr)));
 			}
 			sssColor = sssColor.colorAdd(firstStep);
 
@@ -401,7 +401,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 						currentStep = currentStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 					}
 					if (volume_photon_find.size() != 0) {
-						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/64*PI*maxDistSqr*sqrt(maxDistSqr)));
+						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/8*PI*maxDistSqr*sqrt(maxDistSqr)));
 					}
 					sssColor = sssColor.colorAdd(currentStep);
 					double d = -log(dis_rand(gen))/200;
@@ -576,12 +576,12 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 			if (colorSpecial < 0) { //sss
 				// calc spherical coord
-				double d = 0.05;
+				double d = 0.005;
 				Vect pos = intersection_position.vectAdd(intersecting_ray_direction.vectMult(d));
 				Vect sssDir = intersecting_ray_direction;
 
 				std::uniform_real_distribution<> phi_rand(-PI, PI);
-
+				//d = 0.02;
 				for (int s = 0; s < 4; s++) {
 					double theta = acos(sssDir.getVectZ());
 					//double phi = atan2(sssDir.getVectY(), sssDir.getVectX());

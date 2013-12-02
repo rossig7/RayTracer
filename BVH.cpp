@@ -105,7 +105,7 @@ BVH::BVH(vector<Object *> & in_objects)
 
 Object * BVH::Shoot(const Ray &ray, double &distance) const
 {
-    if(isnan(ray.getRayDirection()[0]))
+    if(_isnan(ray.getRayDirection()[0]))
         return NULL;
     performance_counter = 0;
     performance_counter_ch = 0;
