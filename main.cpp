@@ -211,7 +211,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 			Ray reflection_ray(intersection_position, world_ref_ray_dir);
 
             double intersect_distance = 1e9;
-            Object * intersect_obj = bvh->Shot(reflection_ray, intersect_distance);
+            Object * intersect_obj = bvh->Shoot(reflection_ray, intersect_distance);
 
 			if (intersect_obj != nullptr && intersect_distance > accuracy) {
 				//no miss
@@ -263,7 +263,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 					Ray reflection_ray(intersection_position, world_ref_ray_dir);
 
                     double intersect_distance = 1e9;
-                    Object * intersect_obj = bvh->Shot(reflection_ray, intersect_distance);
+                    Object * intersect_obj = bvh->Shoot(reflection_ray, intersect_distance);
 
                     if (intersect_obj != nullptr && intersect_distance > accuracy) {
 							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(accuracy + intersect_distance));
@@ -432,7 +432,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		return;
 
     double intersect_dist = 1e9;
-    Object * intersect_obj = bvh->Shot(photon_ray, intersect_dist);
+    Object * intersect_obj = bvh->Shoot(photon_ray, intersect_dist);
 
     if (intersect_obj == nullptr)
         return;
@@ -600,7 +600,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 					Ray scatterRay(pos, sssDir);
 
                     double intersect_distance = 1e9;
-                    Object * intersect_obj = bvh->Shot(scatterRay, intersect_distance);
+                    Object * intersect_obj = bvh->Shoot(scatterRay, intersect_distance);
 
                     if (intersect_obj != nullptr) {
 						if (intersect_distance > d) {
@@ -715,7 +715,7 @@ int main(int argc, char *argv[])
            ref = scene_objects.at(index_of_winning_object);
 
         double intersect_dist = 1e9;
-        Object * intersect_obj = bvh->Shot(r, intersect_dist);
+        Object * intersect_obj = bvh->Shoot(r, intersect_dist);
 
         // cout << i <<endl;
         assert(intersect_obj == ref);
@@ -852,7 +852,7 @@ for(int i = 0; i < num_threads; i++)
 						}
 
                         double intersect_distance = 1e9;
-                        Object * intersect_obj = bvh->Shot(cam_ray, intersect_distance);
+                        Object * intersect_obj = bvh->Shoot(cam_ray, intersect_distance);
 
 						if (intersect_obj == nullptr) {
 							dofColor[0] += 0;

@@ -103,7 +103,7 @@ BVH::BVH(vector<Object *> & in_objects)
     root.splitNode();
 }
 
-Object * BVH::Shot(const Ray& ray, double & distance) const
+Object * BVH::Shoot(const Ray &ray, double &distance) const
 {
     if(isnan(ray.getRayDirection()[0]))
         return NULL;
@@ -111,7 +111,7 @@ Object * BVH::Shot(const Ray& ray, double & distance) const
     performance_counter_ch = 0;
     if(root.bbox.Intersect(ray, distance) < 0)
         return nullptr;
-    Object * r = Shot(root, ray, distance);
+    Object * r = Shoot(root, ray, distance);
     if(performance_counter > 10000)
     {
         cout << ray.getRayOrigin()[0] << ","  << ray.getRayOrigin()[1] << ","<< ray.getRayOrigin()[2] << "," <<endl;
@@ -121,7 +121,7 @@ Object * BVH::Shot(const Ray& ray, double & distance) const
     return r;
 }
 
-Object * BVH::Shot(const BVHNode & node,const Ray & ray, double & distance) const
+Object * BVH::Shoot(const BVHNode &node, const Ray &ray, double &distance) const
 {
     if(node.bbox.Intersect(ray, distance) < 0)
         return nullptr;
@@ -148,19 +148,19 @@ Object * BVH::Shot(const BVHNode & node,const Ray & ray, double & distance) cons
     Object * result_child = nullptr;
     if(test_distance[0] < test_distance[1])
     {
-        result_child = Shot(*(node.child[0]),ray,distance);
+        result_child = Shoot(*(node.child[0]), ray, distance);
         if(result_child)
             result = result_child;
-        result_child = Shot(*(node.child[1]),ray,distance);
+        result_child = Shoot(*(node.child[1]), ray, distance);
         if(result_child)
             result = result_child;
     }
     else
     {
-        result_child = Shot(*(node.child[1]),ray,distance);
+        result_child = Shoot(*(node.child[1]), ray, distance);
         if(result_child)
             result = result_child;
-        result_child = Shot(*(node.child[0]),ray,distance);
+        result_child = Shoot(*(node.child[0]), ray, distance);
         if(result_child)
             result = result_child;
     }

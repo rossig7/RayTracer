@@ -61,14 +61,14 @@ private:
     mutable int performance_counter_ch;
     mutable int total_obj;
     BVHNode root;
-    Object * Shot(const BVHNode& node,const Ray& ray, double & distance) const;
+    Object *Shoot(const BVHNode &node, const Ray &ray, double &distance) const;
 
 public:
     BVH(vector<Object *> &in_objects);
     // return the nearest intersect object
     // and the distance to the intersect point
     // which below the distance passed in
-    Object * Shot(const Ray& ray, double & distance) const;
+    Object *Shoot(const Ray &ray, double &distance) const;
 };
 
 
