@@ -51,7 +51,7 @@ std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
 Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, Color lightColor, int bounce)
 {
-	Color winning_object_color = intersect_obj->getColor();
+	Color winning_object_color = intersect_obj->getColor(intersection_position);
 
 	Vect winning_object_normal = intersect_obj->getNormalAt(intersection_position);
 
@@ -144,7 +144,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 	if (depth > TRACING_DEPTH) return final_color.clip();
 	intersection_position = intersection_position.vectAdd(intersecting_ray_direction.vectMult(accuracy));
 
-	Color intersect_color = intersect_obj->getColor();
+	Color intersect_color = intersect_obj->getColor(intersection_position);
 	Vect intersect_normal = intersect_obj->getNormalAt(intersection_position);
 
 	double colorSpecial = intersect_color.getColorSpecial();
@@ -406,7 +406,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		int refractMask[3] = {1,1,1};
 		bool canTransmit = true;
 
-		double colorSpecial = intersect_obj->getColor().getColorSpecial();
+		double colorSpecial = intersect_obj->getColor(intersection_position).getColorSpecial();
 
 		if (colorSpecial <= 0) {
 			lightColor = storePhoton(intersection_position, intersecting_ray_direction, intersect_obj, accuracy, ambientLight, lightColor, bounce);
@@ -454,7 +454,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 		}
 
 		if (canTransmit) {
-			if (intersect_obj->getColor().getColorSpecial() == 0) {  // Lambert model
+			if (intersect_obj->getColor(intersection_position).getColorSpecial() == 0) {  // Lambert model
 				double Zeta1 = dis_rand(gen);
 				double Zeta2 = dis_rand(gen);
 				
@@ -642,7 +642,9 @@ int main(int argc, char *argv[])
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
 
 #ifdef LOADOBJ
-	ObjReader* objReader = new ObjReader("bunny_normal.obj", sssWhite, 1.6, 0.2, -1.0, 0.0);
+	TextureMap* map=new TextureMap();
+	map->TextureMapRead("tex.bmp");
+	ObjReader* objReader = new ObjReader("normal.obj", orange, 1.6, 0.2, -0.7, 0.0, map, true);
 	objReader->ReadContent(&scene_objects);
 #endif
 

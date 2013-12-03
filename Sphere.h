@@ -28,6 +28,7 @@ public:
 	virtual Vect getSphereCenter(){return center;}
 	virtual double getSphereRadius(){return radius;}
 	virtual Color getColor(){return color;}
+	virtual Color getColor(Vect position){return color;}
 
 	virtual Vect getNormalAt(Vect point){
 		Vect normal_Vect = point.vectAdd(center.negtive()).normalize();

@@ -1,5 +1,5 @@
 *.out
-*.bmp
+scene.bmp
 /Debug
 /Release
 *.sdf

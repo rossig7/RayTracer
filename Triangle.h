@@ -5,6 +5,8 @@
 #include "Object.h"
 #include "Vect.h"
 #include "Color.h"
+#include "Texture.h"
+#include "TextureMap.h"
 
 class Triangle : public Object {
 	Vect normal;
@@ -14,7 +16,64 @@ class Triangle : public Object {
 	Vect NormalA, NormalB, NormalC;
 	float refraIdx;
 	bool hasSetNormal;
+	bool hasTexture;
+	MyTexture texture_A,texture_B,texture_C;
+	TextureMap * my_map;
 public:
+
+	virtual bool isTextured()
+	{
+		return this->hasTexture;
+	}
+
+	virtual Color getColor(Vect above_position)
+	{
+		if(hasTexture)
+		{
+			Vect position=getProjectPosition(above_position);
+			Color result=getTextureColor(position);
+
+			//result.setColorRed(result.getColorRed()*3);
+			//result.setColorBlue(result.getColorBlue()*3);
+			//result.setColorGreen(result.getColorGreen()*3);
+			return result;
+		}
+		else
+		{
+			return getColor();
+		}
+		
+	}
+
+	Color getTextureColor(Vect position)
+	{
+		double AP_x,AP_y,AB_x,AB_y,AC_x,AC_y,c,b;
+		Vect NormalAB,NormalAC;
+		AP_x=position.getVectX()-A.getVectX();
+		AP_y=position.getVectY()-A.getVectY();
+		AB_x=B.getVectX()-A.getVectX();
+		AB_y=B.getVectY()-A.getVectY();
+		AC_x=C.getVectX()-A.getVectX();
+		AC_y=C.getVectY()-A.getVectY();
+
+		c=(AP_y-(AB_y/AB_x)*AP_x)/(AC_y-(AB_y/AB_x)*AC_x);
+		b=(AP_x-c*AC_x)/AB_x;
+		MyTexture AB(texture_B.Vect2DAdd(texture_A.Vect2DNegate()));
+		MyTexture AC(texture_C.Vect2DAdd(texture_A.Vect2DNegate()));
+		MyTexture result(AB.Vect2DMulti(b).Vect2DAdd(AC.Vect2DMulti(c)).Vect2DAdd(texture_A));
+
+		return my_map->GetColor(result);
+	}
+
+	void setTexture(MyTexture texture_A,MyTexture texture_C, MyTexture texture_B,bool use_texture,TextureMap* map)
+	{
+		this->texture_A=texture_A;
+		this->texture_B=texture_B;
+		this->texture_C=texture_C;
+		this->my_map=map;
+		hasTexture=use_texture;
+	}
+
     virtual BBox getBBox() const
     {
         BBox result;
@@ -34,6 +93,7 @@ public:
         distance = 0;
         color = Color(0.5,0.5,0.5,0);
         refraIdx = 1;
+		hasTexture=false;
     }
 
     Triangle(Vect pointA, Vect pointC, Vect pointB, Color colorValue, float refraIdxValue){
@@ -46,6 +106,7 @@ public:
         color = colorValue;
         refraIdx = refraIdxValue;
         hasSetNormal = false;
+		hasTexture=false;
     }
 
 	virtual void setNormals(Vect normal_a,Vect normal_c,Vect normal_b)
