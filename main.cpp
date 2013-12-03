@@ -644,7 +644,7 @@ int main(int argc, char *argv[])
 #ifdef LOADOBJ
 	TextureMap* map=new TextureMap();
 	map->TextureMapRead("tex.bmp");
-	ObjReader* objReader = new ObjReader("normal.obj", orange, 1.6, 0.2, -0.7, 0.0, map, true);
+	ObjReader* objReader = new ObjReader("water.obj", white_light, 1.6, 0.2, -0.7, 0.0, map, false);
 	objReader->ReadContent(&scene_objects);
 #endif
 
