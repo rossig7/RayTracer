@@ -22,7 +22,7 @@ std::mutex photon_mtx;
 #define PHOTONUSE 1000
 
 #define PI 3.1415926
-#define BOUNCE 3
+#define BOUNCE 5
 #define NATUREE 2.71828
 #define FRESNEL
 #define TRACING_DEPTH 4  // Depth must >= 4
@@ -46,6 +46,7 @@ vector<Photon *> volumePhotons;
 vector<Object *> scene_objects;
 
 std::uniform_real_distribution<> dis_rand(0, 1);
+std::uniform_real_distribution<> dis_rand_100(0, 100);
 std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
 
@@ -267,7 +268,7 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 			Vect light_direction = photon_find[i]->dir.negtive();
 
 			float cosine_angle = intersect_normal.dotProduct(light_direction);
-			if (cosine_angle < 0) cosine_angle = 0;
+			if (cosine_angle < 0) /*cosine_angle = 0;*/  cosine_angle = -cosine_angle;
 
 			final_color = final_color.colorAdd(intersect_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle * weight));
 		}
@@ -419,7 +420,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 			reflectance = FresnelEquation(cosTheta, 1, n2, 0);
 			
-			int roll = rand() % 100;
+			int roll = dis_rand_100(gen);
 			if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
 				canTransmit = false;
 			}
@@ -430,7 +431,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 			float n2 = intersect_obj->getRefraIdx();
 
 			reflectance = FresnelEquation(cosTheta, 1, n2, 0);
-			int roll = rand() % 100;
+			int roll = dis_rand_100(gen);
 			if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
 				canTransmit = false;
 			}
@@ -446,7 +447,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 					cosTheta = winning_object_normal.negtive().dotProduct(intersecting_ray_direction.negtive());
 					reflectance = FresnelEquation(cosTheta, n2, 1, 1);
 				}
-				int roll = rand() % 100;
+				int roll = dis_rand_100(gen);
 				if (roll > reflectance * 100) {   // absorb rate of 0.2. TODO: add absorb/refraction/refraction rate
 					refractMask[i] = 0;
 				}
@@ -475,7 +476,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 				photon_ray_direction = world_ref_ray_dir;
 				photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce+1);		
 			}
-			else if (colorSpecial < 1 && colorSpecial > 0) {
+			else if (colorSpecial <= 1 && colorSpecial > 0) {
 				double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive()); // N*L
 				Vect scalar1 = winning_object_normal.vectMult(dot1); // (N*L)*N
 				Vect add1 = scalar1.vectAdd(intersecting_ray_direction);
@@ -485,11 +486,18 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 				photon_ray = Ray(intersection_position, reflection_dir);
 				photon_ray_direction = reflection_dir;
+
+				Color winning_object_color = intersect_obj->getColor(intersection_position);
+
+				lightColor.setColorRed(min(winning_object_color.getColorRed(), lightColor.getColorRed()));
+				lightColor.setColorGreen(min(winning_object_color.getColorGreen(), lightColor.getColorGreen()));
+				lightColor.setColorBlue(min(winning_object_color.getColorBlue(), lightColor.getColorBlue()));
+
 				photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, lightColor, bounce+1);
 			}
-			else if (colorSpecial < 2 && colorSpecial > 0) {
-				for (int i = 0; i < 3; i++) {
-					if (refractMask == 0) continue;
+			else if (colorSpecial <= 2 && colorSpecial > 1) {
+				for (int i = 0; i < 1; i++) {
+					if (refractMask[i] == 0) continue;
 					double n1n2 = 1.0 / (intersect_obj->getRefraIdx()-0.01 + i/100.0);
 					double dot1 = winning_object_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
 	
@@ -515,21 +523,29 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 						//lightColor = white_light;
 						if (i == 0) {
 							refractColor = lightColor;
-							refractColor.setColorGreen(0);
-							refractColor.setColorBlue(0);
+							//refractColor.setColorGreen(0);
+							//refractColor.setColorBlue(0);
 						}
 						else if (i == 1) {
 							refractColor = lightColor;
-							refractColor.setColorRed(0);
-							refractColor.setColorBlue(0);
+							//refractColor.setColorRed(0);
+							//refractColor.setColorBlue(0);
 						}
 						else if (i == 2) {
 							refractColor = lightColor;
-							refractColor.setColorRed(0);
-							refractColor.setColorGreen(0);
+							//refractColor.setColorRed(0);
+							//refractColor.setColorGreen(0);
 						}
-						if (!(refractColor.getColorRed() == 0 && refractColor.getColorGreen() == 0 && refractColor.getColorBlue() == 0))
+						if (!(refractColor.getColorRed() == 0 && refractColor.getColorGreen() == 0 && refractColor.getColorBlue() == 0)) {
+							Color winning_object_color = intersect_obj->getColor(intersection_position);
+
+							refractColor.setColorRed(min(winning_object_color.getColorRed(), lightColor.getColorRed()));
+							refractColor.setColorGreen(min(winning_object_color.getColorGreen(), lightColor.getColorGreen()));
+							refractColor.setColorBlue(min(winning_object_color.getColorBlue(), lightColor.getColorBlue()));
+
 							photonEmission (photon_ray, photon_ray_direction, scene_objects, accuracy, ambientLight, refractColor, bounce+1);
+
+						}
 					}		
 				}
 			}	
@@ -605,7 +621,7 @@ int main(int argc, char *argv[])
 	Vect Y (0, 1, 0);
 	Vect Z (0, 0, 1);
 
-	Vect new_sphere_pos (0.3, -0.7, -0.4);
+	Vect new_sphere_pos (0.3, -0.4, -0.4);
 	Vect new_sphere_pos2 (0.3, -0.7, 0.4);
 
 	Vect camPos(2.8, 0, 0);
@@ -626,7 +642,8 @@ int main(int argc, char *argv[])
 	Color refractWhite(1.0, 1.0, 1.0, 1.887654);
 #else
 	Color reflectWhite (1.0, 1.0, 1.0, 0.9);
-	Color refractWhite (1.0, 1.0, 1.0, 2);
+	Color refractWhite (1.0, 1.0, 1.0, 1.8);
+	Color refractWater (0.26, 0.84, 1.0, 1.8);
 #endif
 	Color maroon(0.5, 0.25, 0.25, 2);
 	Color pretty_maroon(0.5, 0.25, 0.25, 0.6);
@@ -635,8 +652,8 @@ int main(int argc, char *argv[])
 	Color orange(0.94, 0.75, 0.31, 0);
 	Color sssWhite(1.0, 1.0, 1.0, -0.9);
 
-	//Vect light_position(0.1, 0.2, 0);
-	Vect light_position(-0.8, 0.2, -0.4);
+	Vect light_position(0.1, 0.2, 0);
+	//Vect light_position(-0.8, 0.2, -0.4);
 	Light scene_light (light_position, white_light);
 	vector<Source *> light_sources;
 	light_sources.push_back(dynamic_cast<Source *>(&scene_light));
@@ -644,16 +661,16 @@ int main(int argc, char *argv[])
 #ifdef LOADOBJ
 	TextureMap* map=new TextureMap();
 	map->TextureMapRead("tex.bmp");
-	ObjReader* objReader = new ObjReader("water.obj", white_light, 1.6, 0.2, -0.7, 0.0, map, false);
+	ObjReader* objReader = new ObjReader("water.obj", refractWater, 1.33, 0.2, -0.6, 0.0, map, false);
 	objReader->ReadContent(&scene_objects);
 #endif
 
 	//Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
-	Sphere scene_sphere (new_sphere_pos, 0.3, sssWhite, 1.5);
+	Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 1.5);
 	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite, 1.5);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange, 20);
 
-	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
+	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
 	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
 
 	makeCornellBox(scene_objects, Vect(1, 1, 1), Vect(-1, -1, -1));
