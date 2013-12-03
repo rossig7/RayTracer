@@ -19,7 +19,7 @@ std::mutex photon_mtx;
 
 /*NOTICE: a good value pair would be (50000,1200), too large PHOTONMUM/PHOTONUSE will produce spotty result, too small will produce over-blurred shadow*/
 #define PHOTONMUM 50000
-#define PHOTONUSE 1200
+#define PHOTONUSE 1000
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -657,7 +657,6 @@ int main(int argc, char *argv[])
 	makeCornellBox(scene_objects, Vect(1, 1, 1), Vect(-1, -1, -1));
 
     bvh = new BVH(scene_objects);
-
     BVHSelfTest(scene_objects, bvh);
 
     tPrep = clock();
@@ -709,6 +708,8 @@ for(int i = 0; i < num_threads; i++)
 	if (volumePhotons.size() > 3) {
 		volumeKDTree = new KDTree(volumePhotons);
 	}
+
+    KDTreeSelfTest(kdtree, photons);
 
 	tPhoton = clock();
 	float diffPhoton = ((float) tPhoton - (float) tPrep) / CLOCKS_PER_SEC;

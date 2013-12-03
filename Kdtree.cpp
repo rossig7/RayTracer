@@ -3,7 +3,7 @@
 #include "Photon.h"
 #include "Kdtree.h"
 
-#define PHOTONDIST 0.5
+#define PHOTONDIST 0.28
 
 #define PI 3.1415926
 #define BOUNCE 3
@@ -11,6 +11,15 @@
 void KDTree::createKD_(vector<Photon *> &photons, KDNode *parent)
 {
 	assert(photons.size() > max_elements);
+    double span_axis[3];
+    for(int i = 0; i < 3; i++)
+    {
+        auto span = minmax_element(photons.begin(), photons.end(),
+                [&](const Photon *a, const Photon *b) -> bool
+                        {return a->position[i] < b->position[i];});
+        span_axis[i] = (*span.second)->position[i] - (*span.first)->position[i] ;
+    }
+    parent->axis = max_element(span_axis, span_axis + 3) - span_axis;
 
 	sort(photons.begin(), photons.end(),
 		[&](const Photon *a, const Photon *b) -> bool
@@ -29,7 +38,6 @@ void KDTree::createKD_(vector<Photon *> &photons, KDNode *parent)
 	}
 	else {
 		parent->left_branch = new KDNode();
-		parent->left_branch->axis = (parent->axis + 1) % 3;
 		createKD_(left, parent->left_branch);
 	}
 	if (right.size() <= max_elements) {
@@ -37,7 +45,6 @@ void KDTree::createKD_(vector<Photon *> &photons, KDNode *parent)
 	}
 	else {
 		parent->right_branch = new KDNode();
-		parent->right_branch->axis = (parent->axis + 1) % 3;
 		createKD_(right, parent->right_branch);
 	}
 
@@ -63,153 +70,78 @@ void KDTree::destroyKD_(KDNode *parent)
 
 	delete parent;
 }
+void KDTree::updateQueue( int k, Photon * photon, const Vect& center ,
+        priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue) const
+{
+    if (KNN_queue.size() < k &&
+            photon->position.sqrDist(center) < PHOTONDIST * PHOTONDIST) {
+        KNN_queue.push(photon);
+        return;
+    }
+    float dis = 1e6;
+    if (KNN_queue.size() > 0) {
+        Photon *topPhoton = KNN_queue.top();
+        dis = topPhoton->position.sqrDist(center);
+    }
+    if (photon->position.sqrDist(center) < dis
+            && photon->position.sqrDist(center) < PHOTONDIST * PHOTONDIST) {
+        KNN_queue.push(photon);
+        KNN_queue.pop();
+    }
+}
 
 void KDTree::findKNN_(int k, Vect center, KDNode *root,
-        priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue)
+        priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue) const
 {
-	/*
-	Photon * topPhoton = KNN_queue->top();
-	float farDistance = topPhoton->position.sqrDist(center);
-    */
+    if(root == nullptr)
+        return;
+
+    double dis = 1e6;
+    if (KNN_queue.size() == k) {
+        Photon *topPhoton = KNN_queue.top();
+        dis = topPhoton->position.sqrDist(center);
+    }
+    float farDistance = min(PHOTONDIST * PHOTONDIST * 1., dis * 1.);
 
 	for (int i = 0; i < root->left.size(); i++) {
-		//perf_count++;
-		if (KNN_queue.size() < k &&
-				root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue.push(root->left[i]);
-			continue;
-		}
-		float dis = 1e3;
-		if (KNN_queue.size() > 0) {
-			Photon *topPhoton = KNN_queue.top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->left[i]->position.sqrDist(center) < dis
-				&& root->left[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue.push(root->left[i]);
-			KNN_queue.pop();
-		}
+#if KD_PERF_TEST == 1
+        performance_counter++;
+#endif
+        updateQueue(k,root->left[i],center,KNN_queue);
 	}
 
 	for (int i = 0; i < root->right.size(); i++) {
-		//perf_count++;
-		if (KNN_queue.size() < k &&
-				root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue.push(root->right[i]);
-			continue;
-		}
-		float dis = 1e3;
-		if (KNN_queue.size() > 0) {
-			Photon *topPhoton = KNN_queue.top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->right[i]->position.sqrDist(center) < dis
-				&& root->right[i]->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue.push(root->right[i]);
-			KNN_queue.pop();
-		}
+#if KD_PERF_TEST == 1
+        performance_counter++;
+#endif
+        updateQueue(k,root->right[i],center,KNN_queue);
 	}
 
 	// Pivot Self
-	// perf_count++;
-	if (KNN_queue.size() < k &&
-			root->self->position.sqrDist(center) < PHOTONDIST) {
-		KNN_queue.push(root->self);
+#if KD_PERF_TEST == 1
+    performance_counter++;
+#endif
+    updateQueue(k,root->self,center,KNN_queue);
+
+	if (center[root->axis] < root->self->position[root->axis]) {
+			findKNN_(k, center, root->left_branch, KNN_queue);
+		if ((center[root->axis] - root->self->position[root->axis])
+                * (center[root->axis] - root->self->position[root->axis]) <= farDistance)
+            findKNN_(k, center, root->right_branch, KNN_queue);
 	}
 	else {
-		float dis = 1e3;
-		if (KNN_queue.size() > 0) {
-			Photon *topPhoton = KNN_queue.top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		if (root->self->position.sqrDist(center) < dis &&
-				root->self->position.sqrDist(center) < PHOTONDIST) {
-			KNN_queue.push(root->self);
-			KNN_queue.pop();
-		}
-	}
-
-	// Order Left First
-	int is_left_first = 0;
-	int need_other = 1;
-	switch (root->axis) {
-		case 0:
-			if (center.getVectX() < root->self->position.getVectX())
-				is_left_first = 1;
-	        break;
-		case 1:
-			if (center.getVectY() < root->self->position.getVectY())
-				is_left_first = 1;
-	        break;
-		case 2:
-			if (center.getVectZ() < root->self->position.getVectZ())
-				is_left_first = 1;
-	        break;
-	}
-
-	if (is_left_first) {
-		if (root->left_branch) {
-			findKNN_(k, center, root->left_branch, KNN_queue);
-		}
-		float dis = 1e3;
-		if (KNN_queue.size() > 0) {
-			Photon *topPhoton = KNN_queue.top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		float farDistance = min(PHOTONDIST * PHOTONDIST * 1., dis * 1.);
-		switch (root->axis) {
-			case 0:
-				if (abs(center.getVectX() - root->self->position.getVectX()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 1:
-				if (abs(center.getVectY() - root->self->position.getVectY()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 2:
-				if (abs(center.getVectZ() - root->self->position.getVectZ()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-		}
-		if (need_other && root->right_branch) {
-			findKNN_(k, center, root->right_branch, KNN_queue);
-		}
-	}
-	else {
-		if (root->right_branch) {
-			findKNN_(k, center, root->right_branch, KNN_queue);
-		}
-
-		float dis = 1e3;
-		if (KNN_queue.size() > 0) {
-			Photon *topPhoton = KNN_queue.top();
-			dis = topPhoton->position.sqrDist(center);
-		}
-		float farDistance = min(PHOTONDIST * PHOTONDIST * 1., dis * 1.);
-		switch (root->axis) {
-			case 0:
-				if (abs(center.getVectX() - root->self->position.getVectX()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 1:
-				if (abs(center.getVectY() - root->self->position.getVectY()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-			case 2:
-				if (abs(center.getVectZ() - root->self->position.getVectZ()) > sqrt(farDistance))
-					need_other = 0;
-		        break;
-		}
-
-		if (need_other && root->left_branch) {
-			findKNN_(k, center, root->left_branch, KNN_queue);
-		}
-
+		findKNN_(k, center, root->right_branch, KNN_queue);
+        if ((center[root->axis] - root->self->position[root->axis])
+                * (center[root->axis] - root->self->position[root->axis]) <= farDistance)
+        findKNN_(k, center, root->left_branch, KNN_queue);
 	}
 }
 
-vector<Photon *> KDTree::findKNN(int k, Vect center)
+vector<Photon *> KDTree::findKNN(int k, Vect center) const
 {
+#if KD_PERF_TEST == 1
+    performance_counter = 0;
+#endif
     auto KNN_queue = priority_queue<Photon *, vector<Photon *>, distanceComparison>
 			(distanceComparison(center));
 
@@ -221,37 +153,60 @@ vector<Photon *> KDTree::findKNN(int k, Vect center)
 		KNN_queue.pop();
 	}
 	reverse(result.begin(), result.end());
+#if KD_PERF_TEST == 1
+    if(performance_counter * 1. / total_obj > 0.1)
+        cout <<"POINT:" << center[0] << "," << center[1] << "," << center[2] << endl;
+    cout << "KD: " << k << ":" << performance_counter << ":" << total_obj << endl;
+#endif
 	return result;
 }
 
-// Test kd tree
-/*
-const Vect Goal(1,0.5,0.4);
-perf_count = 0;
-vector<Photon *> testfind = findKNN(20, Goal, Root);
-vector<Photon *> copy_test = photons;
-sort(copy_test.begin(), copy_test.end(),
-		[Goal](const Photon *a, const Photon *b) -> bool
-				{
-					return a->position.sqrDist(Goal) <
-							b->position.sqrDist(Goal);
-				});
 
-cout << "Total..." << perf_count << endl;
-for (int i = 0; i < testfind.size(); i++) {
-	//cout << testfind[i]->position.sqrDist(copy_test[i]->position) << endl;
-	if(testfind[i]->position.sqrDist(Goal) -
-			copy_test[i]->position.sqrDist(Goal) > 1e-7)
-	{
-		cout << testfind[i]->position.getVectX() << " "
-			<< testfind[i]->position.getVectY() << " "
-				<< testfind[i]->position.getVectZ() << " "
-				<< endl;
-		cout << copy_test[i]->position.getVectX() << " "
-				<< copy_test[i]->position.getVectY() << " "
-				<< copy_test[i]->position.getVectZ() << " "
-				<< endl;
-		cout << endl;
-	}
+void KDTreeSelfTest(KDTree* kdtree, vector<Photon *> photons){
+    std::uniform_real_distribution<> rg(-1, 1);
+    for(int i_case = 0; i_case < KD_SELF_TEST_TIMES; i_case++)
+    {
+        int k;
+        const Vect Goal(rg(gen),rg(gen),rg(gen));
+        vector<Photon *> testfind = kdtree->findKNN(k, Goal);
+        vector<Photon *> copy_test = photons;
+        sort(copy_test.begin(), copy_test.end(),
+                [Goal](const Photon *a, const Photon *b) -> bool
+                        {
+                            return a->position.sqrDist(Goal) <
+                                    b->position.sqrDist(Goal);
+                        });
+
+        for (int i = 0; i < testfind.size(); i++) {
+            if(testfind[i]->position.sqrDist(Goal) -
+                    copy_test[i]->position.sqrDist(Goal) > 1e-9)
+            {
+                cout << "KD TEST FAILED AT case: " << i_case << endl;
+                cout << Goal.getVectX() << " "
+                        << Goal.getVectY() << " "
+                        << Goal.getVectZ() << " "
+                        << endl;
+                cout << "IDX: " << i << " Real Distance: "
+                        << copy_test[i]->position.sqrDist(Goal)
+                        << " Wrong Distance: "
+                        << testfind[i]->position.sqrDist(Goal) << endl;
+                cout << testfind[i]->position.getVectX() << " "
+                    << testfind[i]->position.getVectY() << " "
+                        << testfind[i]->position.getVectZ() << " "
+                        << endl;
+                cout << copy_test[i]->position.getVectX() << " "
+                        << copy_test[i]->position.getVectY() << " "
+                        << copy_test[i]->position.getVectZ() << " "
+                        << endl;
+                cout << endl;
+            }
+        }
+        if(testfind.size() > 0)
+        assert(copy_test[testfind.size() - 1]->position.sqrDist(Goal) <= PHOTONDIST * PHOTONDIST);
+        assert(copy_test[testfind.size()]->position.sqrDist(Goal) > PHOTONDIST * PHOTONDIST
+        ||testfind.size() == k);
+    }
+#if KD_SELF_TEST_TIMES > 0
+    cout << "KD Self Test Passed\n";
+#endif
 }
-*/

@@ -122,12 +122,7 @@ Object * BVH::Shoot(const Ray &ray, double &distance) const
         return nullptr;
     Object * r = Shoot(root, ray, distance);
 #if BVH_PERF_TEST == 1
-    if(performance_counter > 10000)
-    {
-        cout << ray.getRayOrigin()[0] << ","  << ray.getRayOrigin()[1] << ","<< ray.getRayOrigin()[2] << "," <<endl;
-        cout << ray.getRayDirection()[0] << ","  << ray.getRayDirection()[1] << ","<< ray.getRayDirection()[2] << "," <<endl;
-    }
-    // cout << performance_counter_ch << ":" << performance_counter << ":" << total_obj << endl;
+    cout << performance_counter_ch << ":" << performance_counter << ":" << total_obj << endl;
 #endif
     return r;
 }
@@ -225,10 +220,9 @@ int winningObjectIndex(vector<double> object_intersections)
 void BVHSelfTest(vector<Object *> objects, BVH *bvh)
 {
     // BVH self check
+    std::uniform_real_distribution<> rg(-1, 1);
     for(int i = 0; i < BVH_SELF_TEST_TIMES; i++)
     {
-        std::uniform_real_distribution<> rg(-1, 1);
-
         vector<double> intersections;
         Ray r(Vect(rg(gen),rg(gen),rg(gen)),Vect(rg(gen),rg(gen),rg(gen)));
         for (int index = 0; index < objects.size(); index++) {

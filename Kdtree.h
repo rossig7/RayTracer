@@ -2,6 +2,7 @@
 #define _KDTREE_H
 
 #include "Vect.h"
+#include "BVH.h"
 #include <vector>
 #include "Photon.h"
 
@@ -36,34 +37,40 @@ private:
 		}
 	};
 
-	int perf_count;
+#if KD_PERF_TEST == 1
+    mutable int performance_counter;
+    mutable int total_obj;
+#endif
 	static const int max_elements = 3;
 	KDNode *Root;
 
+    void updateQueue( int k, Photon * photon,const Vect& center,
+            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue) const;
 	void destroyKD_(KDNode *parent);
 	void createKD_(vector<Photon *> &photons, KDNode *parent);
 	void findKNN_(int k, Vect center, KDNode *root,
-            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue );
+            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue ) const;
 	KDTree()
 	{
-		perf_count = 0;
 		Root = NULL;
 	}
 
 public:
 	KDTree(vector<Photon *> &photons)
 	{
-		perf_count = 0;
 		Root = NULL;
+#if KD_PERF_TEST == 1
+        total_obj = photons.size();
+#endif
 		createKD(photons);
 	}
 	~KDTree()
 	{
 		destroyKD_(Root);
 	}
-	vector<Photon *> findKNN(int k, Vect center);
+	vector<Photon *> findKNN(int k, Vect center) const;
 	void createKD(vector<Photon *> &photons);
 };
 
-
+void KDTreeSelfTest(KDTree* kdtree, vector<Photon *> photons);
 #endif // !_PHTOTN_H
