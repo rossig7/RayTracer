@@ -133,16 +133,38 @@ public:
 	{
 		double dot_x=x;
 		double dot_y=y;
-		while(dot_x-1>0)
-			dot_x-=1;
-		while(dot_y-1>0)
-			dot_y-=1;
+		if(dot_x>0)
+		{
+			while(dot_x-1>0)
+				dot_x-=1;
+		}
+		else if(dot_x<0)
+		{
+			do 
+			{
+				dot_x+=1;
+			} while (dot_x<0);
+		}
+		
+		if(dot_y>0)
+		{
+			while(dot_y-1>0)
+				dot_y-=1;
+		}
+		else if(dot_y<0)
+		{
+			do 
+			{
+				dot_y+=1;
+			} while (dot_y<0);
+		}
+
 		dot_x=dot_x*(x_res-1);
 		dot_y=dot_y*(y_res-1);
 		int floor_x=int(dot_x);
-		int ceil_x=floor_x+1;
+		int ceil_x=(floor_x+1)>=x_res?x_res-1:floor_x+1;
 		int floor_y=int(dot_y);
-		int ceil_y=floor_y+1;
+		int ceil_y=(floor_y+1)>=y_res?y_res-1:floor_y+1;
 
 		Color left_up=ColorMap[floor_x][floor_y];
 		Color left_down=ColorMap[ceil_x][floor_y];
