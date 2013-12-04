@@ -19,9 +19,9 @@ public:
 		z = k;
 	}
 
-	double getVectX() const{return x;}
-	double getVectY() const{return y;}
-	double getVectZ() const{return z;}
+	inline double getVectX() const{return x;}
+    inline double getVectY() const{return y;}
+    inline double getVectZ() const{return z;}
 
     double operator[](int idx) const
     {
@@ -60,6 +60,10 @@ public:
 	Vect vectAdd(Vect v){
 		return Vect (x+v.getVectX(), y+v.getVectY(), z+ v.getVectZ());
 	}
+
+    Vect vectMinus(Vect v){
+        return Vect (x-v.getVectX(), y-v.getVectY(), z- v.getVectZ());
+    }
 
 	Vect vectMult (double scalar)const{
 		return Vect (x*scalar, y *scalar, z*scalar);

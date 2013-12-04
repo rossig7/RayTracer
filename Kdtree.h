@@ -41,15 +41,15 @@ private:
     mutable int performance_counter;
     mutable int total_obj;
 #endif
-	static const int max_elements = 3;
+	static const int max_elements = 16;
 	KDNode *Root;
 
     void updateQueue( int k, Photon * photon,const Vect& center,
-            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue) const;
+            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue, double &current_best_sqr) const;
 	void destroyKD_(KDNode *parent);
 	void createKD_(vector<Photon *> &photons, KDNode *parent);
 	void findKNN_(int k, Vect center, KDNode *root,
-            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue ) const;
+            priority_queue<Photon *, vector<Photon *>, distanceComparison>& KNN_queue,double &current_best_sqr) const;
 	KDTree()
 	{
 		Root = NULL;

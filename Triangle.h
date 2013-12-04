@@ -258,49 +258,24 @@ public:
 	virtual float getRefraIdx() {return refraIdx;};
 
 	virtual double findIntersection(Ray ray)  {
-		Vect ray_direction = ray.getRayDirection();
-		Vect ray_origin = ray.getRayOrigin();
-
-        normal = getTriangleNormal();
-        distance = getTriangleDistance();
-		double a = ray_direction.dotProduct(normal);
-
-		if (a == 0){
-			// ray parallel to plane
-			return -1;
-		}
-		else{
-			double b = normal.dotProduct(ray.getRayOrigin().vectAdd(normal.vectMult(distance).negtive())); //dafuq?
-			double distance2Plane = -1*b/a;
-
-			double Qx = ray_direction.vectMult(distance2Plane).getVectX() + ray_origin.getVectX();
-			double Qy = ray_direction.vectMult(distance2Plane).getVectY() + ray_origin.getVectY();
-			double Qz = ray_direction.vectMult(distance2Plane).getVectZ() + ray_origin.getVectZ();
-
-			Vect Q (Qx, Qy, Qz);
-
-			//[CAxQA]*n>=0   //dafuq
-			Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
-			Vect QA (Q.getVectX() - A.getVectX(), Q.getVectY() - A.getVectY(), Q.getVectZ() - A.getVectZ());
-			double test1 = CA.crossProduct(QA).dotProduct(normal);
-			//[BCxQC]*n>=0
-			Vect BC (B.getVectX() - C.getVectX(), B.getVectY() - C.getVectY(), B.getVectZ() - C.getVectZ());
-			Vect QC (Q.getVectX() - C.getVectX(), Q.getVectY() - C.getVectY(), Q.getVectZ() - C.getVectZ());
-			double test2 = BC.crossProduct(QC).dotProduct(normal);
-			//[ABxQB]*n>=0
-			Vect AB (A.getVectX() - B.getVectX(), A.getVectY() - B.getVectY(), A.getVectZ() - B.getVectZ());
-			Vect QB (Q.getVectX() - B.getVectX(), Q.getVectY() - B.getVectY(), Q.getVectZ() - B.getVectZ());
-			double test3 = AB.crossProduct(QB).dotProduct(normal);
-			
-			if (test1 >= 0 && test2 >= 0 && test3 >= 0) {
-				//inside the triangle
-			}
-			else {
-				return -1;
-			}
-
-			return -1*b/a - 0.000001;
-		}
+		Vect d = ray.getRayDirection();
+		Vect o = ray.getRayOrigin();
+        Vect e1 = B.vectMinus(A);
+        Vect e2 = C.vectMinus(A);
+        Vect q = d.crossProduct(e2);
+        double a = e1.dotProduct(q);
+        if(abs(a) < 0.00001)
+            return -1;
+        double f = 1 / a;
+        Vect s = o.vectMinus(A);
+        double u = f * s.dotProduct(q);
+        if(u < 0.)
+            return -1;
+        Vect r = s.crossProduct(e1);
+        double v = f * d.dotProduct(r);
+        if(v < 0. || u + v > 1.)
+            return -1;
+        return f * r.dotProduct(e2);
 	}
 };
 

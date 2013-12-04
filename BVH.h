@@ -42,7 +42,7 @@ struct BBox
 
 struct BVHNode
 {
-    static const int max_elements = 3;
+    static const int max_elements = 16;
     BVHNode* child[2];
     BBox bbox;
     vector<Object*> objects;

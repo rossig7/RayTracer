@@ -660,13 +660,8 @@ int main(int argc, char *argv[])
 
 #ifdef LOADOBJ
 	TextureMap* map=new TextureMap();
-	map->TextureMapRead("tex.bmp");
-	TextureMap* map1=new TextureMap();
-	map1->TextureMapRead("clamp.bmp");
-	ObjReader* objReader = new ObjReader("water.obj", refractWater, 1.33, 0.2, -0.6, 0.0, map, true);
-	ObjReader* objReader1 = new ObjReader("normal.obj", refractWater, 1.33, 0.2, -0.6, 0.0, map1, true);
+    ObjReader* objReader = new ObjReader("bunny_normal.obj", sssWhite, 1.6, 0.2, -1.0, 0.0, map, false);
 	objReader->ReadContent(&scene_objects);
-	objReader1->ReadContent(&scene_objects);
 #endif
 
 	//Sphere scene_sphere (new_sphere_pos, 0.3, reflectWhite, 220);
