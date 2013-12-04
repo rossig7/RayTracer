@@ -49,19 +49,19 @@ public:
 		return Vect(-x, -y, -z);
 	}
 
-	double dotProduct(Vect v){
+	double dotProduct(const Vect& v) const{
 		return x*v.getVectX() + y*v.getVectY() + z* v.getVectZ();
 	}
 
-	Vect crossProduct(Vect v){
+	Vect crossProduct(const Vect& v) const{
 		return Vect(y*v.getVectZ()-z*v.getVectY(), z*v.getVectX()-x*v.getVectZ(), x*v.getVectY()-y*v.getVectX());
 	}
 
-	Vect vectAdd(Vect v){
+	Vect vectAdd(const Vect& v) const{
 		return Vect (x+v.getVectX(), y+v.getVectY(), z+ v.getVectZ());
 	}
 
-    Vect vectMinus(Vect v){
+    Vect vectMinus(const Vect& v) const{
         return Vect (x-v.getVectX(), y-v.getVectY(), z- v.getVectZ());
     }
 
@@ -69,7 +69,7 @@ public:
 		return Vect (x*scalar, y *scalar, z*scalar);
 	}
 
-	double sqrDist(Vect v) const{
+	double sqrDist(const Vect& v) const{
 		return (x - v.x) * (x - v.x) + (y - v.y) * (y - v.y)
 				+ (z - v.z) * (z - v.z);
 	}

@@ -13,9 +13,9 @@ public:
     Object(){};
 
 	virtual Color getColor(){return Color(0.0,0.0,0.0,0);}
-	virtual Color getColor(Vect position){return Color(0.0,0.0,0.0,0);}
+	virtual Color getColor(const Vect& position){return Color(0.0,0.0,0.0,0);}
     virtual BBox getBBox() const = 0;
-	virtual double findIntersection(Ray ray)  {
+	virtual double findIntersection(const Ray& ray)  {
 		return 0;
 	}
 
@@ -23,8 +23,8 @@ public:
 	{
 		return false;
 	}
-	virtual Vect getNormalAt(Vect point)  = 0;
-	virtual Vect getTangentAt(Vect point)  = 0;
+	virtual Vect getNormalAt(const Vect& point)  = 0;
+	virtual Vect getTangentAt(const Vect& point)  = 0;
 	virtual float getRefraIdx() {return 1;}
 };
 

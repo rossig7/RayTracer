@@ -139,24 +139,24 @@ Vect computeGlossyRay(Vect reflection_direction, Vect winning_object_normal, dou
 	return world_ref_ray_dir.normalize();
 }
 
-Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, int depth)
+Color getColorAt(Vect hit_pos, Vect hit_dir, Object *hit_obj, double accuracy, double ambientLight, int depth)
 {
 	Color final_color(0,0,0,0);
 	if (depth > TRACING_DEPTH) return final_color.clip();
-	intersection_position = intersection_position.vectAdd(intersecting_ray_direction.vectMult(accuracy));
+	hit_pos = hit_pos.vectAdd(hit_dir.vectMult(accuracy));
 
-	Color intersect_color = intersect_obj->getColor(intersection_position);
-	Vect intersect_normal = intersect_obj->getNormalAt(intersection_position);
+	Color hit_color = hit_obj->getColor(hit_pos);
+	Vect hit_normal = hit_obj->getNormalAt(hit_pos);
 
-	double colorSpecial = intersect_color.getColorSpecial();
+	double colorSpecial = hit_color.getColorSpecial();
 
 	if (colorSpecial > 0) {  // have reflection
-		Vect reflection_direction = computeReflectionDir(intersect_normal, intersecting_ray_direction);
+		Vect reflection_direction = computeReflectionDir(hit_normal, hit_dir);
 
 		double sample;
 		double sampledGlossyReflectColor = 0;
 		Color sampleGlossyReflectColor(0,0,0,0);
-		double colorSpecial = intersect_color.getColorSpecial();
+		double colorSpecial = hit_color.getColorSpecial();
 
 		if (colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7654 < 0.0001 && colorSpecial*100.0 - floor(colorSpecial*100.0) - 0.7653 > 0) 
 			sample = GLOSSY_SAMPLE;
@@ -165,24 +165,24 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 		for (int i = 0; i < sample; i ++) {
 			Vect world_ref_ray_dir;
 			if (sample != 1)
-				world_ref_ray_dir = computeGlossyRay(reflection_direction, intersect_normal, 0.2);
+				world_ref_ray_dir = computeGlossyRay(reflection_direction, hit_normal, 0.2);
 			else
 				world_ref_ray_dir = reflection_direction;
 
-			Ray reflection_ray(intersection_position, world_ref_ray_dir);
+			Ray reflection_ray(hit_pos, world_ref_ray_dir);
 
             double intersect_distance = 1e9;
             Object * intersect_obj = bvh->Shoot(reflection_ray, intersect_distance);
 
-			if (intersect_obj != nullptr && intersect_distance > accuracy) {
+			if (hit_obj != nullptr && intersect_distance > accuracy) {
 				//no miss
-					Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(intersect_distance));
+					Vect reflection_intersection_position = hit_pos.vectAdd(reflection_direction.vectMult(intersect_distance));
 					Vect reflection_intersection_direction = reflection_direction;
 
-					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, intersect_obj, accuracy, ambientLight, depth+1);
+					Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, hit_obj, accuracy, ambientLight, depth+1);
 
 					if (colorSpecial > 1) 
-						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - intersect_color.getColorSpecial()));
+						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color.colorScalar(2 - hit_color.getColorSpecial()));
 					else
 						sampleGlossyReflectColor = sampleGlossyReflectColor.colorAdd(reflection_intersection_color);
 					sampledGlossyReflectColor++;
@@ -198,14 +198,14 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 			for (int i = 0; i < sample; i ++) {
 				Vect world_ref_ray_dir;
 
-				double refractance = intersect_color.getColorSpecial() - 1;
+				double refractance = hit_color.getColorSpecial() - 1;
 
-				double n1n2 = 1.0 / intersect_obj->getRefraIdx();
-				double dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+				double n1n2 = 1.0 / hit_obj->getRefraIdx();
+				double dot1 = hit_normal.dotProduct(hit_dir.negtive());  // NL
 
 				if (dot1 < 0) {
-					intersect_normal = intersect_normal.negtive();
-					dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());
+					hit_normal = hit_normal.negtive();
+					dot1 = hit_normal.dotProduct(hit_dir.negtive());
 					n1n2 = 1.0 / n1n2;
 				}
 
@@ -214,23 +214,23 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 
 				if (underSQRT > 0) {
 					double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-					Vect reflection_direction = intersect_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+					Vect reflection_direction = hit_normal.vectMult(coeffN).vectAdd((hit_dir.negtive().vectMult(n1n2)).negtive());
 
 					if (sample != 1)
-						world_ref_ray_dir = computeGlossyRay(reflection_direction, intersect_normal, 0.2);
+						world_ref_ray_dir = computeGlossyRay(reflection_direction, hit_normal, 0.2);
 					else
 						world_ref_ray_dir = reflection_direction;
 
-					Ray reflection_ray(intersection_position, world_ref_ray_dir);
+					Ray reflection_ray(hit_pos, world_ref_ray_dir);
 
                     double intersect_distance = 1e9;
                     Object * intersect_obj = bvh->Shoot(reflection_ray, intersect_distance);
 
-                    if (intersect_obj != nullptr && intersect_distance > accuracy) {
-							Vect reflection_intersection_position = intersection_position.vectAdd(reflection_direction.vectMult(accuracy + intersect_distance));
+                    if (hit_obj != nullptr && intersect_distance > accuracy) {
+							Vect reflection_intersection_position = hit_pos.vectAdd(reflection_direction.vectMult(accuracy + intersect_distance));
 							Vect reflection_intersection_direction = reflection_direction;
 
-							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, intersect_obj, accuracy, ambientLight, depth+1);
+							Color reflection_intersection_color = getColorAt(reflection_intersection_position, reflection_intersection_direction, hit_obj, accuracy, ambientLight, depth+1);
 
 							sampleGlossyRefractColor = sampleGlossyRefractColor.colorAdd(reflection_intersection_color.colorScalar(refractance));
 							sampledGlossyRefractColor++;
@@ -242,22 +242,19 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 		}
 	}
 	else if (colorSpecial <= 0) {
-		vector<Photon *> photon_find = kdtree->findKNN(PHOTONUSE, intersection_position);
+		vector<Photon *> photon_find = kdtree->findKNN(PHOTONUSE, hit_pos);
 		float maxDistSqr = -1;
 
 		Color sssColor(0,0,0,0);
 
-		for(int i = 0; i < photon_find.size(); i++)
-		{
-			float distanceSqr = photon_find[i]->position.sqrDist(intersection_position);
-			if (distanceSqr > maxDistSqr) maxDistSqr = distanceSqr;
-		}
+        if (photon_find.size() != 0)
+            maxDistSqr = photon_find[photon_find.size() - 1]->position.sqrDist(hit_pos);
 
 		//cout<<photon_find.size()<<" "<< maxDistSqr <<endl;
 
 		for(int i = 0; i < photon_find.size(); i++)
 		{
-			float distanceSqr = photon_find[i]->position.sqrDist(intersection_position);
+			float distanceSqr = photon_find[i]->position.sqrDist(hit_pos);
 
 //#define CONE
 #ifdef CONE  // cone filter
@@ -267,10 +264,10 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 #endif
 			Vect light_direction = photon_find[i]->dir.negtive();
 
-			float cosine_angle = intersect_normal.dotProduct(light_direction);
+			float cosine_angle = hit_normal.dotProduct(light_direction);
 			if (cosine_angle < 0) /*cosine_angle = 0;*/  cosine_angle = -cosine_angle;
 
-			final_color = final_color.colorAdd(intersect_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle * weight));
+			final_color = final_color.colorAdd(hit_color.colorMultiply(photon_find[i]->power).colorScalar(cosine_angle * weight));
 		}
 		if (photon_find.size() != 0) {
 			//final_color = final_color.colorScalar(1.0 / (photon_find.size()));
@@ -282,41 +279,38 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 		}
 
 		if (colorSpecial < 0) {   //sss
-			double n1n2 = 1.0 / intersect_obj->getRefraIdx();
-			double dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());  // NL
+			double n1n2 = 1.0 / hit_obj->getRefraIdx();
+			double dot1 = hit_normal.dotProduct(hit_dir.negtive());  // NL
 
 			if (dot1 < 0) {
-				intersect_normal = intersect_normal.negtive();
-				dot1 = intersect_normal.dotProduct(intersecting_ray_direction.negtive());
+				hit_normal = hit_normal.negtive();
+				dot1 = hit_normal.dotProduct(hit_dir.negtive());
 				n1n2 = 1.0 / n1n2;
 			}
 
 			double nNL = n1n2 * dot1;  //n*NL
 			double underSQRT = 1 - n1n2 * n1n2 * (1 - dot1 * dot1); // 1-n^2*(1-(NL)^2)
 
-			vector<Photon *> volume_photon_find = volumeKDTree->findKNN(PHOTONUSE, intersection_position);
+			vector<Photon *> volume_photon_find = volumeKDTree->findKNN(PHOTONUSE, hit_pos);
 			float maxDistSqr = -1;
 			Color firstStep(0,0,0,0);
 
 			//cout << volume_photon_find.size() << endl;
 
-			for(int i = 0; i < volume_photon_find.size(); i++)
-			{
-				float distanceSqr = volume_photon_find[i]->position.sqrDist(intersection_position);
-				if (distanceSqr > maxDistSqr) maxDistSqr = distanceSqr;
-			}
+            if (volume_photon_find.size() != 0)
+                maxDistSqr = volume_photon_find[volume_photon_find.size() - 1]->position.sqrDist(hit_pos);
 
 			for(int i = 0; i < volume_photon_find.size(); i++)
 			{
-				float distanceSqr = volume_photon_find[i]->position.sqrDist(intersection_position);
+				float distanceSqr = volume_photon_find[i]->position.sqrDist(hit_pos);
 
 				float weight = 0.918 * (1 - (1 - pow(NATUREE, -1.953*(distanceSqr)/(2*maxDistSqr)))/(1 - pow(NATUREE, -1.953)));
 				if (weight < 0) weight = 0;
 
 				Vect light_direction = volume_photon_find[i]->dir.negtive();
 
-				//currentStep = currentStep.colorAdd(intersect_color.colorMultiply(photon_find[i]->power));
-				firstStep = firstStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
+				//currentStep = currentStep.colorAdd(hit_color.colorMultiply(photon_find[i]->power));
+				firstStep = firstStep.colorAdd(hit_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 			}
 			if (volume_photon_find.size() != 0) {
 				firstStep = firstStep.colorScalar(1.0/(pow(NATUREE, 0)*PHOTONMUM/8*PI*maxDistSqr*sqrt(maxDistSqr)));
@@ -326,9 +320,9 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 
 			if (underSQRT > 0) {
 				double coeffN = nNL - sqrt(underSQRT);   //n*NL - sqrt(1-n^2*(1-(NL)^2))
-				Vect reflection_direction = intersect_normal.vectMult(coeffN).vectAdd((intersecting_ray_direction.negtive().vectMult(n1n2)).negtive());
+				Vect reflection_direction = hit_normal.vectMult(coeffN).vectAdd((hit_dir.negtive().vectMult(n1n2)).negtive());
 
-				Vect pos = intersection_position.vectAdd(reflection_direction.vectMult(0.02));
+				Vect pos = hit_pos.vectAdd(reflection_direction.vectMult(0.02));
 
 				double pass;
 
@@ -339,16 +333,12 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 
 					//cout << volume_photon_find.size() << endl;
 
-					for(int i = 0; i < volume_photon_find.size(); i++)
-					{
-						float distanceSqr = volume_photon_find[i]->position.sqrDist(pos);
-						if (distanceSqr > maxDistSqr) maxDistSqr = distanceSqr;
-					}
+                    if (volume_photon_find.size() != 0)
+                        maxDistSqr = volume_photon_find[volume_photon_find.size() - 1]->position.sqrDist(hit_pos);
 
 					for(int i = 0; i < volume_photon_find.size(); i++)
 					{
 						float distanceSqr = volume_photon_find[i]->position.sqrDist(pos);
-
 
 						float weight = 0.918 * (1 - (1 - pow(NATUREE, -1.953*(distanceSqr)/(2*maxDistSqr)))/(1 - pow(NATUREE, -1.953)));
 						if (weight < 0) weight = 0;
@@ -358,8 +348,8 @@ Color getColorAt(Vect intersection_position, Vect intersecting_ray_direction, Ob
 						float cosine_angle = reflection_direction.dotProduct(light_direction);
 						if (cosine_angle < 0) cosine_angle = 0;
 
-						//currentStep = currentStep.colorAdd(intersect_color.colorMultiply(photon_find[i]->power));
-						currentStep = currentStep.colorAdd(intersect_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
+						//currentStep = currentStep.colorAdd(hit_color.colorMultiply(photon_find[i]->power));
+						currentStep = currentStep.colorAdd(hit_color.colorMultiply(volume_photon_find[i]->power).colorScalar(/*cosine_angle*/0.2));
 					}
 					if (volume_photon_find.size() != 0) {
 						currentStep = currentStep.colorScalar(1.0/(pow(NATUREE, pass)*PHOTONMUM/8*PI*maxDistSqr*sqrt(maxDistSqr)));
@@ -575,17 +565,13 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 					Ray scatterRay(pos, sssDir);
 
-                    double intersect_distance = 1e9;
+                    double intersect_distance = d;
                     Object * intersect_obj = bvh->Shoot(scatterRay, intersect_distance);
 
-                    if (intersect_obj != nullptr) {
-						if (intersect_distance > d) {
+                    if (intersect_obj == nullptr) {
 							pos = pos.vectAdd(sssDir.vectMult(d));
 							storeVolumePhoton(pos, sssDir, lightColor);
-							lightColor = lightColor.colorScalar(0.6);						
-						}
-						else
-							break;
+							lightColor = lightColor.colorScalar(0.6);
 					}
 					else
 						break;
@@ -669,7 +655,7 @@ int main(int argc, char *argv[])
 	Sphere scene_sphere2 (new_sphere_pos2, 0.3, refractWhite, 1.5);
 	Triangle scene_triangle (Vect(3, 0, 0), Vect(0, 3, 0), Vect(0, 0, 3), orange, 20);
 
-	scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
+	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere));
 	//scene_objects.push_back(dynamic_cast<Object *>(&scene_sphere2));
 
 	makeCornellBox(scene_objects, Vect(1, 1, 1), Vect(-1, -1, -1));

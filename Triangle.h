@@ -26,7 +26,7 @@ public:
 		return this->hasTexture;
 	}
 
-	virtual Color getColor(Vect above_position)
+	virtual Color getColor(const Vect& above_position)
 	{
 		if(hasTexture)
 		{
@@ -45,7 +45,7 @@ public:
 		
 	}
 
-	Color getTextureColor(Vect position)
+	Color getTextureColor(const Vect& position)
 	{
 		//double AP_x,AP_y,AP_z,AB_x,AB_y,AB_z,AC_x,AC_y,AC_z,c,b;
 		//Vect NormalAB,NormalAC;
@@ -154,14 +154,14 @@ public:
 		NormalC=normal_c;
 		hasSetNormal = true;
 	}
-	virtual Vect getProjectPosition(Vect above_position)
+	virtual Vect getProjectPosition(const Vect& above_position)
 	{
 		Vect line_ap=above_position.vectAdd(A.negtive());
 		Vect temp_normal=getTriangleNormal();
 		return temp_normal.vectMult(line_ap.dotProduct(temp_normal)).negtive().vectAdd(line_ap).vectAdd(A);
 	}
 
-	virtual Vect getTriangleSmoothNormal(Vect above_position)
+	virtual Vect getTriangleSmoothNormal(const Vect&  above_position)
 	{
 		/*Vect position=getProjectPosition(above_position);
 		double AP_x,AP_y,AB_x,AB_y,AC_x,AC_y,c,b;
@@ -232,14 +232,14 @@ public:
 	}
 	virtual Color getColor(){return color;}
 
-	virtual Vect getNormalAt(Vect point){
+	virtual Vect getNormalAt(const Vect& point){
 		if(!hasSetNormal)
 			return getTriangleNormal();
 		else
 			return getTriangleSmoothNormal(point);
 	}
 
-	virtual Vect getTangentAt(Vect point){
+	virtual Vect getTangentAt(const Vect& point){
 		if(!hasSetNormal) {
 			Vect CA (C.getVectX() - A.getVectX(), C.getVectY() - A.getVectY(), C.getVectZ() - A.getVectZ());
 			return CA.normalize();
@@ -257,7 +257,7 @@ public:
 
 	virtual float getRefraIdx() {return refraIdx;};
 
-	virtual double findIntersection(Ray ray)  {
+	virtual double findIntersection(const Ray& ray)  {
 		Vect d = ray.getRayDirection();
 		Vect o = ray.getRayOrigin();
         Vect e1 = B.vectMinus(A);

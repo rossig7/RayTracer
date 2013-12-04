@@ -28,20 +28,20 @@ public:
 	virtual Vect getSphereCenter(){return center;}
 	virtual double getSphereRadius(){return radius;}
 	virtual Color getColor(){return color;}
-	virtual Color getColor(Vect position){return color;}
+	virtual Color getColor(const Vect& position){return color;}
 
-	virtual Vect getNormalAt(Vect point){
+	virtual Vect getNormalAt(const Vect& point){
 		Vect normal_Vect = point.vectAdd(center.negtive()).normalize();
 		return normal_Vect;
 	}
 
 	virtual float getRefraIdx() {return refraIdx;};
 
-	virtual Vect getTangentAt(Vect point){
+	virtual Vect getTangentAt(const Vect& point){
 		return Vect(1,0,0);
 	}
 	
-	virtual double findIntersection(Ray ray){
+	virtual double findIntersection(const Ray& ray){
 		Vect ray_direction = ray.getRayDirection();
 		double ray_direction_x = ray_direction.getVectX();
 		double ray_direction_y = ray_direction.getVectY();
