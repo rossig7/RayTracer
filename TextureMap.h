@@ -48,9 +48,9 @@ public:
 			{
 				unsigned char image[3];
 				fread(image, sizeof(unsigned char), 3, fp);
-				ColorMap[i][j].setColorRed(image[0]/255.0);
+				ColorMap[i][j].setColorRed(image[2]/255.0);
 				ColorMap[i][j].setColorGreen(image[1]/255.0);
-				ColorMap[i][j].setColorBlue(image[2]/255.0);
+				ColorMap[i][j].setColorBlue(image[0]/255.0);
 				//if(image!=NULL)
 					//delete(image);
 				//int k=(i*y_res+j)*3;
