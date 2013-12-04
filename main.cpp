@@ -49,6 +49,22 @@ std::uniform_real_distribution<> dis_rand(0, 1);
 std::uniform_real_distribution<> dis_rand_100(0, 100);
 std::uniform_real_distribution<> dis_rand_dof(-APERTURE_SIZE, APERTURE_SIZE);
 
+void CalcTime(string message)
+{
+    using namespace std::chrono;
+
+    static high_resolution_clock::time_point t[20];
+    static int current_ptr = 0;
+    t[current_ptr] = high_resolution_clock::now();
+    if(current_ptr > 0)
+    {
+       cout << "Elapsed: " << (duration_cast<duration<double>>(t[current_ptr] - t[current_ptr-1])).count();
+       cout << "  Total: " << (duration_cast<duration<double>>(t[current_ptr] - t[0])).count() << endl;
+    }
+    cout << message << endl;
+    current_ptr++;
+
+}
 
 Color storePhoton(Vect intersection_position, Vect intersecting_ray_direction, Object * intersect_obj, double accuracy, double ambientLight, Color lightColor, int bounce)
 {
@@ -584,10 +600,7 @@ void photonEmission(Ray photon_ray, Vect photon_ray_direction, vector<Object *> 
 
 int main(int argc, char *argv[])
 {
-	cout << "rendering..." << endl << "Preparing Scene..." << endl;
-
-	clock_t t1, t2, tPrep, tPhoton, tTracing;
-	t1 = clock();
+    CalcTime("Preparing Scene...");
 
 	int dpi = 72;
 	int width = 512;
@@ -660,13 +673,12 @@ int main(int argc, char *argv[])
 
 	makeCornellBox(scene_objects, Vect(1, 1, 1), Vect(-1, -1, -1));
 
+    CalcTime("start build BVH...");
+
     bvh = new BVH(scene_objects);
     BVHSelfTest(scene_objects, bvh);
 
-    tPrep = clock();
-	float diffPrep = ((float) tPrep - (float) t1) / CLOCKS_PER_SEC;
-	cout << diffPrep << "seconds" << endl;
-	cout << "start emit photons..." << endl;
+    CalcTime("start emit photons...");
 
 	std::uniform_real_distribution<> dis(-1, 1);
 	//Color lightColor = white_light.colorScalar(32.0/PHOTONMUM);
@@ -707,6 +719,8 @@ for(int i = 0; i < num_threads; i++)
     for (auto& th : threads) th.join();
     threads.clear();
 
+    CalcTime("start build kdtree...");
+
 	kdtree = new KDTree(photons);
 
 	if (volumePhotons.size() > 3) {
@@ -715,10 +729,7 @@ for(int i = 0; i < num_threads; i++)
 
     KDTreeSelfTest(kdtree, photons);
 
-	tPhoton = clock();
-	float diffPhoton = ((float) tPhoton - (float) tPrep) / CLOCKS_PER_SEC;
-	cout << diffPhoton << "seconds" << endl;
-	cout << "start ray tracing..." << endl;
+    CalcTime("start raytracing...");
 
 
     for(int xdiv = 0; xdiv < num_threads; xdiv++)
@@ -851,20 +862,15 @@ for(int i = 0; i < num_threads; i++)
     for (auto& th : threads) th.join();
     threads.clear();
 
-	tTracing = clock();
-	float diffTracing = ((float) tTracing - (float) tPrep) / CLOCKS_PER_SEC;
-	cout << diffTracing << "seconds" << endl << "saving file" << endl;
+    CalcTime("start saving file...");
 
 	saveBmp("scene.bmp", width, height, dpi, pixels);
-	cout << "Finished" << endl;
 
 	//delete pixels, tempRed, tempGreen, tempBlue;;
 
-	t2 = clock();
-	float diff = ((float) t2 - (float) t1) / CLOCKS_PER_SEC;
+    CalcTime("All Done...");
 
 	//delete kdtree;
-	cout << diff << "seconds" << endl;
 #ifdef LOADOBJ
 	delete objReader;
 #endif

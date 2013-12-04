@@ -41,7 +41,7 @@ private:
     mutable int performance_counter;
     mutable int total_obj;
 #endif
-	static const int max_elements = 16;
+	static const int max_elements = 8;
 	KDNode *Root;
 
     void updateQueue( int k, Photon * photon,const Vect& center,

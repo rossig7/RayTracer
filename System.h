@@ -15,6 +15,9 @@
 #include <time.h>
 #include <assert.h>
 #include <thread>
+#include <ctime>
+#include <ratio>
+#include <chrono>
 #include <random>
 
 #define BVH_SELF_TEST_TIMES 0
